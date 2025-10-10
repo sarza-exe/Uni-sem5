@@ -1,0 +1,15 @@
+*
+!/**/
+!*.*
+**/.idea
+**/cmake-build-debug
+**/.vscode
+**/.venv
+**/venv
+**/.git
+**/__pycache__
+**/node_modules
+*.env
+*.exe
+*.o
+*.map
