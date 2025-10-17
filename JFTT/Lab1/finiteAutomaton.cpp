@@ -104,7 +104,7 @@ void FiniteAutomatonMatcher(const string& T, vector<vector<int>> delta, unordere
         else q = 0;
         if(q == m){
             occurrences++;
-            //cout << "Pattern occurs with shift " << i-m+1 << "\n";
+            cout << "Pattern occurs with shift " << GetLength(T.substr(0,i))-m+1 << "\n";
         }
         i+=w;
     }

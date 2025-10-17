@@ -7,6 +7,28 @@ using namespace std;
 
 // Algorithm from "Introduction to Algorithms" chapter 32.4
 
+// length in bytes of the first utf-8 character starting with c
+int utf8_char_len(unsigned char c) {
+    if (c < 0x80) return 1;
+    if ((c >> 5) == 0x6) return 2;   // 110xxxxx
+    if ((c >> 4) == 0xE) return 3;   // 1110xxxx
+    if ((c >> 3) == 0x1E) return 4;  // 11110xxx
+    return 1;
+}
+
+int GetLength(const string& str)
+{
+    int len = 0;
+    int i = 0;
+    while(i < str.size())
+    {
+        len++;
+        int w = utf8_char_len(static_cast<unsigned char>(str[i]));
+        i += w;
+    }
+    return len;
+}
+
 void ComputePrefixFunction(const string& pattern, vector<int>& pi)
 {
     const int m = static_cast<int>(pattern.length());
@@ -26,6 +48,7 @@ void KMPMatcher(const string& T, const string& P)
 {
     int n = static_cast<int>(T.length());
     int m = static_cast<int>(P.length());
+    int patternLen = GetLength(P);
     if (m == 0) {
         cout << "Empty pattern — matches at all " << m << " positions.\n";
         return;
@@ -42,7 +65,7 @@ void KMPMatcher(const string& T, const string& P)
             q += 1;
         if(q == m){
             occurrences++;
-            //cout << "Pattern occurs with shift " << i-m+1 << "\n";
+            cout << "Pattern occurs with shift " << GetLength(T.substr(0,i+1))-patternLen << "\n";
             q = pi[q-1];
         }
     }
