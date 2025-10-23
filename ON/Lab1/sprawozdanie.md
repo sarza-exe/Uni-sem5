@@ -168,10 +168,10 @@ Wynik dokładny iloczynu skalarnego: $−1.00657107000000\times10^{-11}$
 
 | Algorytm     | Float32                   | Float64                   |
 | :------ | :----------------------------- | :----------------------------- |
-| a | $-4.999442994594573975$   | $1.025188136829667182\times10^{-10}$   |
-| b | $-4.543457031250000000$  | $-1.564330887049436569\times10^{-10}$  |
-| c | $-5.000000000000000000$ | $0.000000000000000000$ |
-| d | $-5.000000000000000000$ | $0.000000000000000000$ |
+| a | $-0.4999442994594573975$   | $1.025188136829667182\times10^{-10}$   |
+| b | $-0.4543457031250000000$  | $-1.564330887049436569\times10^{-10}$  |
+| c | $-0.5000000000000000000$ | $0.000000000000000000$ |
+| d | $-0.5000000000000000000$ | $0.000000000000000000$ |
 
 Tabela 1: Porównanie obliczania iloczynu skalarnego w precyzji pojedynczej i podwójnej poprzez algorytmy dodawania: a) po kolei w przód, b) po kolei od tyłu, c) od największego do najmniejszego oraz d) od najmniejszego do największego.
 

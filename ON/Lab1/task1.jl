@@ -33,11 +33,11 @@ Funkcja dla podanego typu T zwraca wartosc iteracyjnie wyliczonej
 maksymalnej liczby
 """
 function maxV(::Type{T}) where T
-    maxNext = T(2)
+    maxNext = T(2)-eps(T)
     max::T = maxNext
     while !isinf(maxNext)
         max = maxNext
-        maxNext = maxNext * T(2)
+        maxNext = maxNext * T(2)    
     end
     step::T = max
     while (step > 0.0 && max + step > max)
