@@ -67,7 +67,6 @@ def main():
         total_for_file = 0.0
 
         cmd = [py_exec, str(task2_py), "-i", str(txt)]
-        print(f">>> Uruchamiam")
         rc, out, err, elapsed = run_command(cmd)
         total_for_file += elapsed
         total_all += elapsed

@@ -123,7 +123,7 @@ def main():
 
     components = kosaraju_scc(n, adj, radj)
     k = len(components)
-    print("No. components: " , k)
+    print("No. SCC: " , k)
     print("No. vertices in each component:", ', '.join(str(len(c)) for c in components))
     if n <= 200:
         idx = 0
