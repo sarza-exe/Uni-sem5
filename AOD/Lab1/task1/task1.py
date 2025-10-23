@@ -140,6 +140,7 @@ def main():
         order, parent = dfs_full(n, adj, start=args.start)
 
     # Wypisujemy kolejność odwiedzin
+    print("ORDER OF VISITS:")
     print(' '.join(str(x) for x in order))
 
     if args.tree:
