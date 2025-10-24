@@ -1,0 +1,5 @@
+# Ignore specific txt files
+g2*.txt
+g3*.txt
+d4*.txt
+u4*.txt
