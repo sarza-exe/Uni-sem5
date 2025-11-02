@@ -1,3 +1,16 @@
+---
+title: "Sprawozdanie z listy nr 2"
+author: "Sara Żyndul"
+date: "`r Sys.Date()`"
+geometry: margin=2.5cm
+fontsize: 12pt
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{graphicx}
+---
+
+
 <h1 style="text-align:center;">Sprawozdanie z Listy nr 2</h1>
 <p style="text-align:center;">Sara Żyndul</p>
 <p style="text-align:center;">279686</p>
