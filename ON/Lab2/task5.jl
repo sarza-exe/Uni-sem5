@@ -20,6 +20,7 @@ for i in 1:40
     global pprev32 = p32
     p32_cut = popFun(pprev32_cut, r)
     if i == 10
+        # nie da sie zapisac 0.722 dokladnie w float32 (najblizsza wartosc to 7.220000028610e-01)
         p32_cut = floor(p32_cut * Float32(1000)) / Float32(1000)
     end
     global pprev32_cut = p32_cut

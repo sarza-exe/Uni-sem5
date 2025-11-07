@@ -16,6 +16,8 @@
 \usepackage{float}         % Dla opcji [H] (wstaw "tutaj")
 \usepackage{subcaption}    % Do wstawiania obrazków obok siebie (subfigure)
 \usepackage{array}         % Dla zaawansowanych tabel (choć tu proste)
+\usepackage{placeins}
+\usepackage{multirow}
 
 % Inne
 \usepackage{hyperref}      % Tworzy klikalne linki w PDF (opcjonalne)
@@ -36,13 +38,13 @@
 \author{Sara Żyndul \\ 279686}
 \date{} % Usuwa datę
 \maketitle
-%\tableofcontents % Dodaje spis treści
+\tableofcontents % Dodaje spis treści
 \newpage
 
 % --- ZADANIE 1 ---
 \section{Zadanie 1}
 
-\subsection{Opis i Rozwiązanie}
+\subsection{Opis}
 Zadanie polega na powtórzeniu eksperymentu z zadania 5 z listy 1 (wykorzystaniu czterech algorytmów sumowania do obliczenia iloczynu skalarnego dwóch wektorów) przy wprowadzeniu niewielkich zmian w wektorze x. Wektory x, y z poprzedniej listy:
 
 $x = [2.718281828, -3.141592654, 1.414213562, 0.5772156649, 0.3010299957]$
@@ -220,15 +222,15 @@ Interpretacja: rosnące $c$ prowadzi do wzrostu $\operatorname{cond}(A)$ i błę
     \item Wzrost $\operatorname{cond}(A)$ koreluje z rosnącym błędem; ekstremalnie duże wartości $\operatorname{cond}$ prowadzą do błędów rzędu jedności lub większych.
     \item Spadek rzędu numerycznego $(\operatorname{rank}(A) < n)$ wiąże się z gwałtownym pogorszeniem jakości rozwiązania (przykład: $c$ bardzo duże $\rightarrow$ rank spada $\rightarrow$ duże relacje błędów).
     \item W praktyce: zawsze sprawdzać $\operatorname{cond}(A)$ i $\operatorname{rank}(A)$; używać \texttt{A\string\b} zamiast \texttt{inv(A)*b}; dla źle uwarunkowanych macierzy rozważyć regularyzację lub arytmetykę o większej precyzji.
-    \item Dla $\operatorname{cond}(A) \gg 10^{12}$ wyniki mogą nie być wiarygodne bez dodatkowych zabiegów.
+    \item Dla $\operatorname{cond}(A) > 10^{12}$ wyniki mogą nie być wiarygodne bez dodatkowych zabiegów.
 \end{enumerate}
 
 % --- ZADANIE 4 ---
 \section{Zadanie 4}
 
-\subsection{Opis i rozwiązanie}
+\subsection{Opis}
 
-Zadanie: obliczyć miejsca zerowe wielomianu Wilkinsona w postaci naturalnej $P(x)$ za pomocą funkcji \texttt{roots} z pakietu \texttt{Polynomials} z Julii. Porównać otrzymane pierwiastki $z_k$ z pierwiastkami „oczekiwanymi” $k=1,\dots,20$ przez obliczenie wartości $|P(z_k)|, |p(z_k)|$ (ewaluacja przez iloczyn $(x-1)\cdots(x-20)$) oraz $|z_k-k|$. Część (b) powtórzona po maleńkiej perturbacji współczynnika o $2^{-23}$.
+Zadanie: obliczyć miejsca zerowe wielomianu Wilkinsona w postaci naturalnej $P(x)$ za pomocą funkcji \texttt{roots} z pakietu \texttt{Polynomials} z Julii. Porównać otrzymane pierwiastki $z_k$ z pierwiastkami „oczekiwanymi” $k=1,\dots,20$ przez obliczenie wartości $|P(z_k)|, |p(z_k)|$ (ewaluacja przez iloczyn $(x-1)\cdots(x-20)$) oraz $|z_k-k|$. Potem powtórzenie eksperymentu po maleńkiej perturbacji współczynnika $-210$ o $-2^{-23}$.
 
 Rozwiązanie znajduje się w pliku \texttt{task4.jl}.
 
@@ -247,7 +249,7 @@ Rozwiązanie znajduje się w pliku \texttt{task4.jl}.
 
 \begin{table}[H]
 \centering
-\caption{Wyniki bez perturbacji: pierwiastki są bliskie wartościom całkowitym, ale odchyłki rosną dla większych $k$. Wartości $|P(z_k)|$ i $|p(z_k)|$ (ewaluacje różnymi metodami) są znaczące — różnice wynikają z kondycji numerycznej ewaluacji.}
+\caption{Wyniki bez perturbacji: pierwiastki są bliskie wartościom właściwym, ale można zauważyć duże błędy przy obliczaniu wartości funkcji $|P(z_k)|$ i $|p(z_k)|$. Sugeruje to, że problem wyznaczania pierwiastków tego wielomianu jest źle uwarunkowany.}
 \begin{tabular}{| r | l | l | l | l |}
 \hline
 $k$ & $z_k$ & $|P(z_k)|$ & $|p(z_k)|$ & $|z_k-k|$ \\
@@ -325,10 +327,10 @@ Zadanie: porównać trajektorie rekurencji wzrostu populacji
 $p_{n+1}=p_n + rp_n(1-p_n)$ dla $p_0=0.01,\ r=3$ w trzech wariantach:
 \begin{itemize}
     \item \texttt{Float32} (bez modyfikacji),
-    \item \texttt{Float32} z jednorazowym \textbf{obcięciem} po 10. iteracji (ucięcie do trzech miejsc po przecinku),
+    \item \texttt{Float32} z jednorazowym \textbf{obcięciem} po 10. iteracji (odrzucenie cyfr po trzecim miejscu po przecinku),
     \item \texttt{Float64}.
 \end{itemize}
-Wykonano 40 iteracji i zapisano wartość ($p_n$) dla każdej iteracji; w raporcie przedstawiono otrzymane wyniki i krótkie komentarze.
+Wykonano 40 iteracji i zapisano wartość ($p_n$) dla każdej iteracji.
 
 Rozwiązanie znajduje się w pliku \texttt{task5.jl}.
 
@@ -394,13 +396,13 @@ $40$ & $2.586054801941\times10^{-1}$ & $1.093567967415\times10^{0}$ & $1.1611238
     \item W początkowych iteracjach wartości funkcji w obu artymetykach są zbieżne.
     \item Już niewielka modyfikacja (obcięcie raz po 10. iteracji) prowadzi do \textbf{znacznie odmiennych} trajektorii. Już przy 19 iteracji model z obcięciem daje duży błąd względem pozostałych dwóch modeli.
     \item Różnice między \texttt{Float32} a \texttt{Float64} kumulują się — różnice rosną z liczbą iteracji (od iteracji 22 widać znaczne różnice w wartościach funkcji) i zachodzi efekt kumulacji błędów.
-    \item Model logistyczny przy ($r=3$) jest czuły na drobne zmiany wartości i precyzję arytmetyki — niewielkie perturbacje (obcięcie lub niższa precyzja) dają duże rozbieżności końcowe.
+    \item Model logistyczny przy ($r=3$) jest numerycznie niestabilny — niewielkie błędy kumulują się dając duże rozbieżności końcowe. Wynika to z czułości na drobne zmiany wartości i precyzję arytmetyki.
 \end{enumerate}
 
 % --- ZADANIE 6 ---
 \section{Zadanie 6}
 
-\subsection{Opis i rozwiązanie}
+\subsection{Opis}
 
 Zadanie polega na obliczaniu w arytmetyce \texttt{Float64} kolejnych wartości wyrażenia rekurencyjnego $x_{n+1}=x_{n}^2+c$. Rozwiązanie znajduje się w pliku \texttt{task6.jl}.
 
@@ -456,48 +458,71 @@ Poniższe graficzne iteracje ciągów to siatka, w której oś pozioma określa 
 \caption{Start bardzo blisko $2$. Przez kilka iteracji $x_n\approx2$, potem wartości stopniowo oddalają się od $2$ i pojawiają się duże oscylacje/zmiany (przejście przez wartości $>1$, $<0$, aż do dużych ujemnych) — wrażliwość na maleńkie perturbacje.}
 \end{figure}
 
+\FloatBarrier
 
-% Tabela jest bardzo szeroka, zmniejszamy czcionkę i odstępy
 \begin{table}[H]
 \centering
-\tiny % Najmniejsza czcionka
-\setlength\tabcolsep{3pt} % Zmniejszenie odstępów między kolumnami
+\tiny
+\setlength\tabcolsep{3pt}
 \begin{tabular}{| r | r | r | r | r | r | r | r |}
 \hline
-iter & $c=-2, x_0=1$ & $c=-2, x_0=2$ & $c=-2, x_0=1.99...9$ & $c=-1, x_0=1$ & $c=-1, x_0=-1$ & $c=-1, x_0=0.75$ & $c=-1, x_0=0.25$ \\
+\multirow{2}{*}{iter} & (case 1) & (case 2) & (case 3) & (case 4) & (case 5) & (case 6) & (case 7) \\
+& $c=-2, x_0=1$ & $c=-2, x_0=2$ & $c=-2, x_0=1.99...9$ & $c=-1, x_0=1$ & $c=-1, x_0=-1$ & $c=-1, x_0=0.75$ & $c=-1, x_0=0.25$ \\
 \hline
-$1$ & $-1.00000$ & $2.00000$ & $2.00000$ & $0.00000$ & $0.00000$ & $-0.43750$ & $-0.93750$ \\
-$2$ & $-1.00000$ & $2.00000$ & $2.00000$ & $-1.00000$ & $-1.00000$ & $-0.80859$ & $-0.12109$ \\
-$3$ & $-1.00000$ & $2.00000$ & $2.00000$ & $0.00000$ & $0.00000$ & $-0.34618$ & $-0.98534$ \\
-$4$ & $-1.00000$ & $2.00000$ & $2.00000$ & $-1.00000$ & $-1.00000$ & $-0.88016$ & $-0.02911$ \\
-$5$ & $-1.00000$ & $2.00000$ & $2.00000$ & $0.00000$ & $0.00000$ & $-0.22531$ & $-0.99915$ \\
-$6$ & $-1.00000$ & $2.00000$ & $2.00000$ & $-1.00000$ & $-1.00000$ & $-0.94923$ & $-0.00169$ \\
-$7$ & $-1.00000$ & $2.00000$ & $2.00000$ & $0.00000$ & $0.00000$ & $-0.09896$ & $-1.00000$ \\
-$8$ & $-1.00000$ & $2.00000$ & $1.99999$ & $-1.00000$ & $-1.00000$ & $-0.99021$ & $-0.00001$ \\
-$9$ & $-1.00000$ & $2.00000$ & $2.00000$ & $0.00000$ & $0.00000$ & $-0.01949$ & $-1.00000$ \\
-$10$ & $-1.00000$ & $2.00000$ & $1.99999$ & $-1.00000$ & $-1.00000$ & $-0.99962$ & $0.00000$ \\
-$11$ & $-1.00000$ & $2.00000$ & $2.00000$ & $0.00000$ & $0.00000$ & $-0.00076$ & $-1.00000$ \\
-$12$ & $-1.00000$ & $2.00000$ & $2.00000$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$13$ & $-1.00000$ & $2.00000$ & $1.99999$ & $0.00000$ & $0.00000$ & $-0.00000$ & $-1.00000$ \\
-$14$ & $-1.00000$ & $2.00000$ & $2.00000$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$15$ & $-1.00000$ & $2.00000$ & $1.99999$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$16$ & $-1.00000$ & $2.00000$ & $1.99996$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$17$ & $-1.00000$ & $2.00000$ & $1.99983$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$18$ & $-1.00000$ & $2.00000$ & $1.99931$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$19$ & $-1.00000$ & $2.00000$ & $1.99725$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$20$ & $-1.00000$ & $2.00000$ & $1.98902$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$21$ & $-1.00000$ & $2.00000$ & $1.95622$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$22$ & $-1.00000$ & $2.00000$ & $1.82678$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$23$ & $-1.00000$ & $2.00000$ & $1.33712$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$24$ & $-1.00000$ & $2.00000$ & $-0.21211$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$25$ & $-1.00000$ & $2.00000$ & $-1.95501$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$26$ & $-1.00000$ & $2.00000$ & $1.82206$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$27$ & $-1.00000$ & $2.00000$ & $1.31991$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$28$ & $-1.00000$ & $2.00000$ & $-0.25784$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
-$29$ & $-1.00000$ & $2.00000$ & $-1.93352$ & $0.00000$ & $0.00000$ & $0.00000$ & $-1.00000$ \\
-$30$ & $-1.00000$ & $2.00000$ & $1.73850$ & $-1.00000$ & $-1.00000$ & $-1.00000$ & $0.00000$ \\
+1 & -1.0000000000 & 2.0000000000 & 2.0000000000 & 0.0000000000 & 0.0000000000 & -0.4375000000 & -0.9375000000 \\
+2 & -1.0000000000 & 2.0000000000 & 2.0000000000 & -1.0000000000 & -1.0000000000 & -0.8085937500 & -0.1210937500 \\
+3 & -1.0000000000 & 2.0000000000 & 2.0000000000 & 0.0000000000 & 0.0000000000 & -0.3461761475 & -0.9853363037 \\
+4 & -1.0000000000 & 2.0000000000 & 2.0000000000 & -1.0000000000 & -1.0000000000 & -0.8801620749 & -0.0291123686 \\
+5 & -1.0000000000 & 2.0000000000 & 2.0000000000 & 0.0000000000 & 0.0000000000 & -0.2253147219 & -0.9991524700 \\
+6 & -1.0000000000 & 2.0000000000 & 2.0000000000 & -1.0000000000 & -1.0000000000 & -0.9492332761 & -0.0016943417 \\
+7 & -1.0000000000 & 2.0000000000 & 1.9999999998 & 0.0000000000 & 0.0000000000 & -0.0989561875 & -0.9999971292 \\
+8 & -1.0000000000 & 2.0000000000 & 1.9999999993 & -1.0000000000 & -1.0000000000 & -0.9902076730 & -0.0000057416 \\
+9 & -1.0000000000 & 2.0000000000 & 1.9999999974 & 0.0000000000 & 0.0000000000 & -0.0194887644 & -1.0000000000 \\
+10 & -1.0000000000 & 2.0000000000 & 1.9999999895 & -1.0000000000 & -1.0000000000 & -0.9996201881 & -0.0000000001 \\
+11 & -1.0000000000 & 2.0000000000 & 1.9999999581 & 0.0000000000 & 0.0000000000 & -0.0007594796 & -1.0000000000 \\
+12 & -1.0000000000 & 2.0000000000 & 1.9999998324 & -1.0000000000 & -1.0000000000 & -0.9999994232 & 0.0000000000 \\
+13 & -1.0000000000 & 2.0000000000 & 1.9999993294 & 0.0000000000 & 0.0000000000 & -0.0000011536 & -1.0000000000 \\
+14 & -1.0000000000 & 2.0000000000 & 1.9999973178 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+15 & -1.0000000000 & 2.0000000000 & 1.9999892712 & 0.0000000000 & 0.0000000000 & -0.0000000000 & -1.0000000000 \\
+16 & -1.0000000000 & 2.0000000000 & 1.9999570848 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+17 & -1.0000000000 & 2.0000000000 & 1.9998283411 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+18 & -1.0000000000 & 2.0000000000 & 1.9993133938 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+19 & -1.0000000000 & 2.0000000000 & 1.9972540465 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+20 & -1.0000000000 & 2.0000000000 & 1.9890237264 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+21 & -1.0000000000 & 2.0000000000 & 1.9562153843 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+22 & -1.0000000000 & 2.0000000000 & 1.8267786299 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+23 & -1.0000000000 & 2.0000000000 & 1.3371201626 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+24 & -1.0000000000 & 2.0000000000 & -0.2121096709 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+25 & -1.0000000000 & 2.0000000000 & -1.9550094875 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+26 & -1.0000000000 & 2.0000000000 & 1.8220620963 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+27 & -1.0000000000 & 2.0000000000 & 1.3199102828 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+28 & -1.0000000000 & 2.0000000000 & -0.2578368453 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+29 & -1.0000000000 & 2.0000000000 & -1.9335201612 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+30 & -1.0000000000 & 2.0000000000 & 1.7385002138 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+31 & -1.0000000000 & 2.0000000000 & 1.0223829935 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+32 & -1.0000000000 & 2.0000000000 & -0.9547330147 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+33 & -1.0000000000 & 2.0000000000 & -1.0884848707 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+34 & -1.0000000000 & 2.0000000000 & -0.8152006863 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+35 & -1.0000000000 & 2.0000000000 & -1.3354478410 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+36 & -1.0000000000 & 2.0000000000 & -0.2165790640 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+37 & -1.0000000000 & 2.0000000000 & -1.9530935090 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+38 & -1.0000000000 & 2.0000000000 & 1.8145742551 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
+39 & -1.0000000000 & 2.0000000000 & 1.2926797272 & 0.0000000000 & 0.0000000000 & 0.0000000000 & -1.0000000000 \\
+40 & -1.0000000000 & 2.0000000000 & -0.3289791230 & -1.0000000000 & -1.0000000000 & -1.0000000000 & 0.0000000000 \\
 \hline
 \end{tabular}
+\caption{Iteracje ciągu $x_{n+1}=x_n^2+c$ dla różnych parametrów (precyzja Float64).}
+\label{tab:iterations_full}
 \end{table}
+
+\subsection{Wnioski}
+
+\begin{enumerate}
+    \item Proces generowania ciągów równaniem rekurencyjnym ma różną stabilność w zależności od przyjętych parametrów.
+    
+    \item Dla $c=-2$ starty dokładnie w ($2$) lub w ($-1$) dają stałe ciągi (cases 1--2). Natomiast starty bardzo blisko punktu niestabilnego (case 3) \textbf{szybko odchodzą} od niego: maleńka różnica rośnie i prowadzi do dużych zmian --- przykład silnej wrażliwości (numeryczna niestabilność).
+    
+    \item Dla $c=-1$ obserwujemy zachowanie zbieżności do \textbf{przyciągającego cyklu okresu 2} $(0, -1)$. Z różnych początków (cases 4--7) ciągi wchodzą w ten cykl albo w niego od razu trafiają.
+\end{enumerate}
 
 \end{document}

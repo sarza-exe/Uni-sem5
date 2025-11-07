@@ -56,4 +56,3 @@ for (k, zk) in enumerate(z2)
     diff2 = abs(zk - k)
     @printf("| %2d | % .12f+%.8fim | %9.3e | %9.3e | %9.3e |\n", k, real(zk), imag(zk), val_P2, val_p2, diff2)
 end
-

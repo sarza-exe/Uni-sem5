@@ -40,7 +40,6 @@ function run_case(c, x0; N=40, name="case")
     return xs
 end
 
-# upewnij się, że katalog plots istnieje
 isdir("plots") || mkdir("plots")
 
 # lista przypadków do uruchomienia (7 przypadków)
@@ -66,9 +65,6 @@ for (idx, (c,x0,name)) in enumerate(cases)
     # zapisz do macierzy wartości x1..x40 jako wiersze 1..40, kolumna idx
     results_mat[:, idx] .= xs[2:end]
 end
-
-# zapisz macierz do CSV (40 wierszy, 7 kolumn)
-writedlm("results_mat.csv", results_mat, ',')
 
 println("Gotowe. Pliki .png zapisane w katalogu plots/ w bieżącym katalogu.")
 
