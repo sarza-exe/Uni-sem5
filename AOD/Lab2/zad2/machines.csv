@@ -1,0 +1,4 @@
+machine,cost_per_hour,hours_available
+M1,2,60
+M2,2,60
+M3,3,60
