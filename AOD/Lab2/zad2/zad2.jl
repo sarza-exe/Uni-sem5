@@ -1,3 +1,4 @@
+# Sara Żyndul
 # Model liniowy: maksymalizacja zysku
 # Dane wejściowe (parametryczne) w plikach CSV:
 #  - products.csv: product, price, matcost, demand, t_M1, t_M2, t_M3
@@ -8,7 +9,7 @@
 using CSV, DataFrames, JuMP, HiGHS
 import MathOptInterface as MOI
 
-
+# wczytanie danych
 function read_data(products_file::String="products.csv", machines_file::String="machines.csv")
     prod_df = CSV.read(products_file, DataFrame)
     mach_df = CSV.read(machines_file, DataFrame)
@@ -34,6 +35,7 @@ function read_data(products_file::String="products.csv", machines_file::String="
     return products, machines, price, matcost, demand, times, cost_per_hour, hours_available
 end
 
+# rozwiązanie problemu
 function solve_production(products_file::String="products.csv", machines_file::String="machines.csv", tol::Float64=1e-6)
     products, machines, price, matcost, demand, times, cost_per_hour, hours_available = read_data(products_file, machines_file)
 

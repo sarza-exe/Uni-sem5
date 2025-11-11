@@ -13,3 +13,5 @@
 *.exe
 *.o
 *.map
+*.aux
+*.log

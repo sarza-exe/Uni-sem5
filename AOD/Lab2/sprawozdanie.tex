@@ -1,0 +1,420 @@
+\documentclass[a4paper, 11pt]{article}
+
+% --- PAKIETY ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs} % Dla ładnych tabel
+\usepackage[margin=1in]{geometry}
+\usepackage{array}
+\usepackage{enumitem}
+
+% --- USTAWIENIA STRONY ---
+\pagestyle{headings}
+\setlength{\parindent}{0pt} % Wyłączenie wcięć akapitowych
+\setlength{\parskip}{1.2ex} % Odstęp między akapitami
+
+% --- DEFINICJE ---
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% --- DOKUMENT ---
+\begin{document}
+
+\title{Sprawozdanie z Laboratorium 2: \\ Programowanie Liniowe i Całkowitoliczbowe}
+\author{Sara Żyndul}
+\date{\today}
+
+\maketitle
+
+\section*{Wstęp}
+Niniejsze sprawozdanie przedstawia modele matematyczne oraz zwięzłą analizę wyników dla zadań z Listy 2. Rozwiązania uzyskano przy użyciu języka Julia z pakietem JuMP.
+
+\newpage
+
+% --- ZADANIE 1 ---
+\section{Zadanie 1: Problem transportu paliwa}
+
+\subsection{Model Matematyczny}
+Problem minimalizacji kosztów dostaw paliwa.
+
+\begin{itemize}
+    \item \textbf{Zbiory:}
+    \begin{itemize}
+        \item $I = \{1, 2, 3\}$: Zbiór dostawców (Firma 1, 2, 3).
+        \item $J = \{1, 2, 3, 4\}$: Zbiór lotnisk (Lotnisko 1, 2, 3, 4).
+    \end{itemize}
+    \item \textbf{Parametry:}
+    \begin{itemize}
+        \item $c_{ij}$: Koszt dostawy 1 galonu od dostawcy $i$ na lotnisko $j$.
+        \item $p_i$: Podaż (pojemność) dostawcy $i$.
+        \item $d_j$: Popyt (zapotrzebowanie) lotniska $j$.
+    \end{itemize}
+    \item \textbf{Zmienne decyzyjne:}
+    \begin{itemize}
+        \item $x_{ij} \ge 0$: Ilość paliwa (w galonach) dostarczona od dostawcy $i$ na lotnisko $j$.
+    \end{itemize}
+    \item \textbf{Funkcja celu (Minimalizacja kosztów):}
+    \begin{equation*}
+        \min Z = \sum_{i \in I} \sum_{j \in J} c_{ij} x_{ij}
+    \end{equation*}
+    \item \textbf{Ograniczenia:}
+    \begin{align*}
+        \sum_{j \in J} x_{ij} &\le p_i \quad \forall i \in I && \text{(Ograniczenie podaży)} \\
+        \sum_{i \in I} x_{ij} &\ge d_j \quad \forall j \in J && \text{(Ograniczenie popytu)}
+    \end{align*}
+\end{itemize}
+
+\subsection{Wyniki i Interpretacja}
+Egzemplarz rozwiązano dla danych z zadania.
+
+\begin{itemize}
+    \item \textbf{(a) Minimalny łączny koszt:} \$8 525 000.
+    \item \textbf{Optymalny plan dostaw:}
+        \begin{table}[h]
+            \centering
+            \begin{tabular}{llr}
+                \toprule
+                Dostawca & Lotnisko & Ilość (galony) \\
+                \midrule
+                Firma 1 & Lotnisko 2 & 165 000.0 \\
+                Firma 1 & Lotnisko 4 & 110 000.0 \\
+                Firma 2 & Lotnisko 1 & 110 000.0 \\
+                Firma 2 & Lotnisko 2 & 55 000.0 \\
+                Firma 3 & Lotnisko 3 & 330 000.0 \\
+                Firma 3 & Lotnisko 4 & 330 000.0 \\
+                \bottomrule
+            \end{tabular}
+        \end{table}
+    \item \textbf{(b) Czy wszystkie firmy dostarczają paliwo?} Tak.
+    \item \textbf{(c) Czy możliwości dostaw są wyczerpane?}
+    \begin{itemize}
+        \item F1: Tak (dostarczono 275 000).
+        \item F2: Nie (dostarczono 165 000 z 550 000).
+        \item F3: Tak (dostarczono 660 000).
+    \end{itemize}
+\end{itemize}
+
+\newpage
+% --- ZADANIE 2 ---
+\section{Zadanie 2: Plan produkcji}
+
+\subsection{Model Matematyczny}
+Problem maksymalizacji tygodniowego zysku z produkcji.
+
+\begin{itemize}
+    \item \textbf{Zbiory:}
+    \begin{itemize}
+        \item $I = \{1, 2, 3, 4\}$: Zbiór produktów ($P_i$).
+        \item $J = \{1, 2, 3\}$: Zbiór maszyn ($M_j$).
+    \end{itemize}
+    \item \textbf{Parametry:}
+    \begin{itemize}
+        \item $t_{ij}$: Czas obróbki produktu $i$ na maszynie $j$ (min/kg).
+        \item $L_j$: Dostępny czas maszyny $j$ (60 godz. = 3600 min).
+        \item $c_i$: Cena sprzedaży produktu $i$ (\$/kg).
+        \item $k_{m_i}$: Koszt materiałowy produktu $i$ (\$/kg).
+        \item $k_{p_j}$: Koszt pracy maszyny $j$ (\$/godz).
+        \item $D_i$: Maksymalny tygodniowy popyt na produkt $i$ (kg).
+    \end{itemize}
+    \item \textbf{Zmienne decyzyjne:}
+    \begin{itemize}
+        \item $x_i \ge 0$: Ilość (w kg) wyprodukowanego produktu $i$.
+    \end{itemize}
+    \item \textbf{Zysk jednostkowy (obliczony):}
+    Niech $z_i$ będzie zyskiem jednostkowym dla produktu $i$:
+    $z_i = c_i - k_{m_i} - \sum_{j \in J} (k_{p_j} / 60) \cdot t_{ij}$
+    \item \textbf{Funkcja celu (Maksymalizacja zysku):}
+    \begin{equation*}
+        \max Z = \sum_{i \in I} z_i x_i
+    \end{equation*}
+    \item \textbf{Ograniczenia:}
+    \begin{align*}
+        \sum_{i \in I} t_{ij} x_i &\le 3600 \quad \forall j \in J && \text{(Limit czasu maszyn)} \\
+        0 \le x_i &\le D_i \quad \forall i \in I && \text{(Limit popytu)}
+    \end{align*}
+\end{itemize}
+
+\subsection{Wyniki i Interpretacja}
+Egzemplarz rozwiązano dla danych z zadania.
+
+\begin{itemize}
+    \item \textbf{Maksymalny tygodniowy zysk:} \$3632.5.
+    \item \textbf{Optymalny plan produkcji:}
+    \begin{itemize}
+        \item P1: 125.0 kg (Popyt Niewyczerpany)
+        \item P2: 100.0 kg (Popyt Wyczerpany)
+        \item P3: 150.0 kg (Popyt Wyczerpany)
+        \item P4: 500.0 kg (Popyt Wyczerpany)
+    \end{itemize}
+    \item \textbf{Wykorzystanie maszyn:}
+    \begin{itemize}
+        \item M1: 58.75 / 60 h (97.92\%)
+        \item M2: 60.0 / 60 h (100.0\%)
+        \item M3: 35.0 / 60 h (58.33\%)
+    \end{itemize}
+\end{itemize}
+
+\newpage
+% --- ZADANIE 3 ---
+\section{Zadanie 3: Produkcja i magazynowanie}
+
+\subsection{Model Matematyczny}
+Problem minimalizacji kosztów produkcji i magazynowania w $K=4$ okresach.
+
+\begin{itemize}
+    \item \textbf{Zbiory:}
+    \begin{itemize}
+        \item $J = \{1, 2, 3, 4\}$: Zbiór okresów.
+    \end{itemize}
+    \item \textbf{Parametry:}
+    \begin{itemize}
+        \item $c_j, o_j$: Koszt jednostkowy produkcji normalnej i ponadwymiarowej w $j$.
+        \item $a_j, d_j$: Limit produkcji ponadwymiarowej i popyt w $j$.
+        \item $P_{max} = 100$: Limit produkcji normalnej.
+        \item $M_{max} = 70$: Pojemność magazynu.
+        \item $k_m = 1500$: Koszt magazynowania jednostki przez 1 okres.
+        \item $m_0 = 15$: Stan początkowy magazynu.
+    \end{itemize}
+    \item \textbf{Zmienne decyzyjne:}
+    \begin{itemize}
+        \item $x_j \ge 0$: Produkcja normalna w okresie $j$.
+        \item $y_j \ge 0$: Produkcja ponadwymiarowa w okresie $j$.
+        \item $m_j \ge 0$: Stan magazynu na koniec okresu $j$.
+    \end{itemize}
+    \item \textbf{Funkcja celu (Minimalizacja kosztów):}
+    \begin{equation*}
+        \min Z = \sum_{j \in J} (c_j x_j + o_j y_j + k_m m_j)
+    \end{equation*}
+    \item \textbf{Ograniczenia:}
+    \begin{align*}
+        m_{j-1} + x_j + y_j &= d_j + m_j \quad \forall j \in J && \text{(Bilans magazynu)} \\
+        0 \le x_j &\le P_{max} \quad \forall j \in J && \text{(Limit prod. normalnej)} \\
+        0 \le y_j &\le a_j \quad \forall j \in J && \text{(Limit prod. ponadwym.)} \\
+        0 \le m_j &\le M_{max} \quad \forall j \in J && \text{(Pojemność magazynu)}
+    \end{align*}
+\end{itemize}
+
+\subsection{Wyniki i Interpretacja}
+Egzemplarz rozwiązano dla $K=4$ i danych z tabeli.
+
+\begin{itemize}
+    \item \textbf{(a) Minimalny łączny koszt:} \$3 842 500.
+    \item \textbf{Optymalny plan:}
+        \begin{table}[h]
+            \centering
+            \begin{tabular}{lrrr}
+                \toprule
+                Okres & Prod. Normalna & Prod. Ponadwym. & Magazyn (koniec) \\
+                \midrule
+                1 & 100.0 & 15.0 & 0.0 \\
+                2 & 100.0 & 50.0 & 70.0 \\
+                3 & 100.0 & 0.0 & 45.0 \\
+                4 & 100.0 & 50.0 & 0.0 \\
+                \bottomrule
+            \end{tabular}
+        \end{table}
+    \item \textbf{(b) Produkcja ponadwymiarowa:} Wystąpiła w okresach 1 (15.0), 2 (50.0) i 4 (50.0).
+    \item \textbf{(c) Wyczerpanie magazynu:} Magazyn był w pełni wykorzystany (70 jednostek) na koniec okresu 2.
+\end{itemize}
+
+\newpage
+% --- ZADANIE 4 ---
+\section{Zadanie 4: Najkrótsza ścieżka z ograniczeniem}
+
+\subsection{Model Matematyczny}
+Problem znalezienia ścieżki o minimalnym koszcie, nie przekraczającej limitu czasu $T$. Jest to problem programowania całkowitoliczbowego (MIP).
+
+\begin{itemize}
+    \item \textbf{Zbiory:}
+    \begin{itemize}
+        \item $N$: Zbiór miast (wierzchołków).
+        \item $A$: Zbiór połączeń (łuków skierowanych).
+    \end{itemize}
+    \item \textbf{Parametry:}
+    \begin{itemize}
+        \item $c_{ij}, t_{ij}$: Koszt i czas przejazdu łukiem $(i,j) \in A$.
+        \item $s = i^{\circ}$: Wierzchołek startowy.
+        \item $t = j^{\circ}$: Wierzchołek końcowy.
+        \item $T$: Maksymalny dozwolony czas.
+    \end{itemize}
+    \item \textbf{Zmienne decyzyjne:}
+    \begin{itemize}
+        \item $x_{ij} \in \{0, 1\}$: Zmienna binarna, 1 jeśli łuk $(i,j)$ należy do ścieżki, 0 w p.p.
+    \end{itemize}
+    \item \textbf{Funkcja celu (Minimalizacja kosztów):}
+    \begin{equation*}
+        \min Z = \sum_{(i,j) \in A} c_{ij} x_{ij}
+    \end{equation*}
+    \item \textbf{Ograniczenia:}
+    \begin{align*}
+        \sum_{(i,j) \in A} t_{ij} x_{ij} &\le T && \text{(Limit czasu)} \\
+        \sum_{j: (i,j) \in A} x_{ij} - \sum_{j: (j,i) \in A} x_{ji} &= \begin{cases} 1 & \text{dla } i = s \\ -1 & \text{dla } i = t \\ 0 & \text{w p.p.} \end{cases} \quad \forall i \in N && \text{(Zachowanie przepływu)}
+    \end{align*}
+\end{itemize}
+
+\subsection{Wyniki i Interpretacja}
+\begin{itemize}
+    \item \textbf{Egzemplarz (a):} Dane z pliku `graphA.csv`, $s=1, t=10, T=15$.
+    \begin{itemize}
+        \item \textbf{Wynik:} Minimalny koszt = 13.0, Całkowity czas = 15.0.
+        \item \textbf{Ścieżka:} $1 \to 2 \to 3 \to 5 \to 7 \to 9 \to 10$.
+    \end{itemize}
+    
+    \item \textbf{Egzemplarz (b):} Własny egzemplarz (`graphB.csv`), $s=1, t=10, T=15$.
+    \begin{itemize}
+        \item \textbf{Wynik:} Minimalny koszt = 11.0, Całkowity czas = 11.0.
+        \item \textbf{Ścieżka:} $1 \to 3 \to 7 \to 10$.
+    \end{itemize}
+    % POPRAWKA: Obrazek wstawiony PO podpunkcie, ale wciąż W OBRĘBIE \item (b)
+    % Usunięto \begin{figure} i \caption
+    \begin{center}
+            \includegraphics[totalheight=4cm]{zad4/mygraph.png} \\
+            \textit{Graficzna reprezentacja grafu dla egzemplarza (b).}
+    \end{center}
+    
+    \item \textbf{(c) Czy ograniczenie całkowitoliczbowości jest potrzebne?} Tak. W klasycznym problemie najkrótszej ścieżki (bez limitu czasu) relaksacja LP naturalnie daje wynik całkowitoliczbowy. Dodanie bocznego ograniczenia (jak $\sum t_{ij} x_{ij} \le T$) psuje tę własność. Relaksacja LP mogłaby dać ułamkowe rozwiązanie (np. 0.5 jednej ścieżki i 0.5 drugiej), co nie jest poprawną ścieżką.
+    
+    % POPRAWKA: Obrazek wstawiony W OBRĘBIE \item (c)
+    \begin{center}
+        \includegraphics[totalheight=2cm]{zad4/graph.png}
+    \end{center}
+    
+    % DODANA INTERPRETACJA GRAFU:
+    Powyższy graf ilustruje ten problem. Szukamy ścieżki z 1 do 4 przy limicie czasu $T=11$.
+    \begin{itemize}
+        \item \textbf{Ścieżka A (1-2-4):} Jest bardzo tania (Koszt=2), ale niedopuszczalna (Czas=20 > 11).
+        \item \textbf{Ścieżka B (1-3-4):} Jest bardzo droga (Koszt=20), ale dopuszczalna (Czas=2 $\le$ 11).
+    \end{itemize}
+    Model MIP (całkowitoliczbowy) musi wybrać całą ścieżkę B, dając \textbf{Koszt = 20}.
+    
+    Jednak model LP (bez ograniczeń całkowitoliczbowych) może "zmieszać" obie ścieżki. Optymalnym rozwiązaniem LP jest wzięcie 50\% ścieżki A i 50\% ścieżki B. Daje to:
+    \begin{itemize}
+        \item \textbf{Koszt LP:} $0.5 \times 2 + 0.5 \times 20 = 1 + 10 = \mathbf{11}$
+        \item \textbf{Czas LP:} $0.5 \times 20 + 0.5 \times 2 = 10 + 1 = \mathbf{11}$
+    \end{itemize}
+    Rozwiązanie LP (Koszt=11) jest dopuszczalne czasowo i znacznie lepsze niż rozwiązanie MIP (Koszt=20). Jest ono jednak bezużyteczne, ponieważ $x_{12}, x_{24}, x_{13}, x_{34}$ mają ułamkowe wartości (0.5). To dowodzi, że ograniczenie całkowitoliczbowości jest niezbędne.
+    
+    \item \textbf{(d) Czy po usunięciu ograniczenia na czasy przejazdu, ograniczenia na całkowitoliczbowość są nadal potrzebne?} Nie. Usunięcie "bocznego" ograniczenia na czas ($\sum t_{ij} x_{ij} \le T$) sprowadza nasz problem z powrotem do \textbf{klasycznego problemu najkrótszej ścieżki}. W takim przypadku, ograniczenia na całkowitoliczbowość ($x_{ij} \in \{0, 1\}$) nie są już konieczne. Dzieje się tak, ponieważ model programowania liniowego (LP) dla tego standardowego problemu (gdzie $x_{ij} \ge 0$) posiada gwarancję, że jego optymalne rozwiązanie i tak będzie całkowitoliczbowe. Można to uzasadnić następująco: Załóżmy, że rozwiązanie optymalne LP jest ułamkowe, tzn. "przepływ" ze startu do celu jest rozdzielony na dwie różne ścieżki (np. $\alpha$ dla Ścieżki A i $\beta$ dla Ścieżki B, gdzie $\alpha, \beta > 0$). Niech koszt Ścieżki A to $C_A$, a Ścieżki B to $C_B$, i załóżmy bez straty ogólności, że $C_A \le C_B$.
+    Możemy wtedy natychmiast skonstruować nowe, co najmniej tak samo dobre (a potencjalnie lepsze) rozwiązanie, przenosząc cały przepływ ułamkowy $\beta$ z droższej Ścieżki B na tańszą Ścieżkę A. Nowe rozwiązanie będzie miało przepływ $\alpha+\beta$ na Ścieżce A i $0$ na Ścieżce B. Koszt tego nowego rozwiązania będzie mniejszy lub równy poprzedniemu, ponieważ przenieśliśmy przepływ z droższej na tańszą opcję. Powtarzając ten proces, zawsze dojdziemy do rozwiązania, w którym cały przepływ (równy 1) znajduje się na jednej, najtańszej ścieżce, co jest rozwiązaniem binarnym.
+\end{itemize}
+
+\newpage
+% --- ZADANIE 5 ---
+\section{Zadanie 5: Przydział radiowozów}
+
+\subsection{Model Matematyczny}
+Problem minimalizacji łącznej liczby radiowozów przy spełnieniu ograniczeń.
+
+\begin{itemize}
+    \item \textbf{Zbiory:}
+    \begin{itemize}
+        \item $I = \{p1, p2, p3\}$: Zbiór dzielnic.
+        \item $J = \{1, 2, 3\}$: Zbiór zmian.
+    \end{itemize}
+    \item \textbf{Parametry:}
+    \begin{itemize}
+        \item $L_{ij}, U_{ij}$: Min. i max. liczba radiowozów dla (dzielnica $i$, zmiana $j$).
+        \item $R_i$: Min. łączna liczba radiowozów dla dzielnicy $i$.
+        \item $C_j$: Min. łączna liczba radiowozów dla zmiany $j$.
+    \end{itemize}
+    \item \textbf{Zmienne decyzyjne:}
+    \begin{itemize}
+        \item $x_{ij} \in \Z_{\ge 0}$: Liczba radiowozów (dzielnica $i$, zmiana $j$).
+    \end{itemize}
+    \item \textbf{Funkcja celu (Minimalizacja sumy):}
+    \begin{equation*}
+        \min Z = \sum_{i \in I} \sum_{j \in J} x_{ij}
+    \end{equation*}
+    \item \textbf{Ograniczenia:}
+    \begin{align*}
+        L_{ij} \le x_{ij} &\le U_{ij} \quad \forall i \in I, j \in J && \text{(Limity min/max dla komórki)} \\
+        \sum_{i \in I} x_{ij} &\ge C_j \quad \forall j \in J && \text{(Minimalna suma dla zmiany)} \\
+        \sum_{j \in J} x_{ij} &\ge R_i \quad \forall i \in I && \text{(Minimalna suma dla dzielnicy)}
+    \end{align*}
+\end{itemize}
+
+\subsection{Wyniki i Interpretacja}
+Znaleziono optymalne rozwiązanie.
+
+\begin{itemize}
+    \item \textbf{Optymalny przydział radiowozów:}
+        \begin{table}[h]
+            \centering
+            \begin{tabular}{lrrr}
+                \toprule
+                Dzielnica & Zmiana 1 & Zmiana 2 & Zmiana 3 \\
+                \midrule
+                p1 & 2 & 7 & 5 \\
+                p2 & 3 & 6 & 5 \\
+                p3 & 5 & 7 & 8 \\
+                \bottomrule
+            \end{tabular}
+        \end{table}
+    \item \textbf{Całkowita liczba wykorzystywanych radiowozów:} 48.
+\end{itemize}
+
+\newpage
+% --- ZADANIE 6 ---
+\section{Zadanie 6: Rozmieszczenie kamer}
+
+\subsection{Model Matematyczny}
+Problem pokrycia zbioru (Set Cover). Należy pokryć wszystkie kontenery minimalną liczbą kamer.
+
+\begin{itemize}
+    \item \textbf{Zbiory:}
+    \begin{itemize}
+        \item $C$: Zbiór współrzędnych $(i,j)$ z kontenerami.
+        \item $E$: Zbiór współrzędnych $(i,j)$ pustych (możliwych lokalizacji kamer).
+    \end{itemize}
+    \item \textbf{Parametry:}
+    \begin{itemize}
+        \item $k$: Zasięg kamery (w kwadratach).
+        \item $A_{ce}$: Macierz binarna; $A_{ce} = 1$ jeśli kamera w $e \in E$ "widzi" (pokrywa) kontener $c \in C$ (zgodnie z zasięgiem $k$), 0 w p.p.
+    \end{itemize}
+    \item \textbf{Zmienne decyzyjne:}
+    \begin{itemize}
+        \item $y_e \in \{0, 1\}$: Zmienna binarna, 1 jeśli kamera jest instalowana w $e \in E$, 0 w p.p.
+    \end{itemize}
+    \item \textbf{Funkcja celu (Minimalizacja liczby kamer):}
+    \begin{equation*}
+        \min Z = \sum_{e \in E} y_e
+    \end{equation*}
+    \item \textbf{Ograniczenia:}
+    \begin{align*}
+        \sum_{e \in E} A_{ce} y_e &\ge 1 \quad \forall c \in C && \text{(Każdy kontener pokryty)}
+    \end{align*}
+\end{itemize}
+
+\subsection{Wyniki i Interpretacja}
+$$
+\begin{pmatrix}
+0 & 1 & 0 & 0 & 1 \\
+1 & 0 & 0 & 0 & 0 \\
+0 & 0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 0 & 1 \\
+1 & 0 & 0 & 1 & 0
+\end{pmatrix}
+$$
+\centering
+    \textit{Siatka 5x5 rozkładu kontenerów. 1 oznacza pole z kontenerem, 0 - puste.}
+
+\begin{itemize}
+    \item \textbf{Przypadek 1: $k=1$}
+    \begin{itemize}
+        \item \textbf{Minimalna liczba kamer:} 5.
+        \item \textbf{Lokalizacje (wiersz, kolumna):} [2, 2], [2, 5], [4, 3], [5, 2], [5, 5].
+    \end{itemize}
+    \item \textbf{Przypadek 2: $k=2$}
+    \begin{itemize}
+        \item \textbf{Minimalna liczba kamer:} 3.
+        \item \textbf{Lokalizacje (wiersz, kolumna):} [2, 2], [3, 5], [5, 3].
+    \end{itemize}
+\end{itemize}
+Zwiększenie zasięgu kamer z $k=1$ do $k=2$ pozwoliło zredukować wymaganą liczbę kamer z 5 do 3 dla analizowanej siatki.
+
+\end{document}
