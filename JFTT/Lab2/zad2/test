@@ -1,0 +1,17 @@
+print("this is #\"not a comment\"")
+fun() #comment is this
+
+a = 3.14 # here's a comment
+b = 12.31212 # here's also a comment
+
+s = "hello" # this is a comment " <- shouldn't be part of string
+
+string = "comment in a string # whatever" # but here's a real comment
+str = '''single quoted multi-
+line string # yolo '''
+multiline_string = """
+# comments here dont matter either
+#
+\"I can even write in double quotes\"
+""" # and still add a comment later
+# comment "still a comment#" neverending
