@@ -408,11 +408,29 @@ $$
     \begin{itemize}
         \item \textbf{Minimalna liczba kamer:} 5.
         \item \textbf{Lokalizacje (wiersz, kolumna):} [2, 2], [2, 5], [4, 3], [5, 2], [5, 5].
+        $$
+        \begin{pmatrix}
+        0 & 1 & 0 & 0 & 1 \\
+        1 & K & 0 & 0 & K \\
+        0 & 0 & 1 & K & 0 \\
+        0 & 0 & 0 & 0 & 1 \\
+        1 & K & 0 & 1 & K
+        \end{pmatrix}
+        $$
     \end{itemize}
     \item \textbf{Przypadek 2: $k=2$}
     \begin{itemize}
         \item \textbf{Minimalna liczba kamer:} 3.
         \item \textbf{Lokalizacje (wiersz, kolumna):} [2, 2], [3, 5], [5, 3].
+        $$
+        \begin{pmatrix}
+        0 & 1 & 0 & 0 & 1 \\
+        1 & K & 0 & 0 & 0 \\
+        0 & 0 & 1 & 0 & K \\
+        0 & 0 & 0 & 0 & 1 \\
+        1 & 0 & K & 1 & 0
+        \end{pmatrix}
+        $$
     \end{itemize}
 \end{itemize}
 Zwiększenie zasięgu kamer z $k=1$ do $k=2$ pozwoliło zredukować wymaganą liczbę kamer z 5 do 3 dla analizowanej siatki.
