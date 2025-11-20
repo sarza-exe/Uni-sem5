@@ -6,11 +6,14 @@ bool docs = false;
 
 %%
 \"([^\"\\\n]|(\\\")|(\\\n)|(\\))*\" {printf("%s", yytext);}          /*strings with \ line continuation */
-"/**"[^\n]*(\n[ ]"*"[^\n]*)*\n?"*/" {if(docs) printf("%s", yytext);} /*block starts with /**, every new line start with " *" and last one is */
+"#"include[ \t]*"<"[^>]*">"         {printf("%s", yytext);}
+"/**"[^\n]*(\n[ ]"*"[^\n]*)*\n?[ ]?"*/" {if(docs) printf("%s", yytext);} /*block starts with /**, every new line start with " *" and last one is */
 "/*!"[^\n]*(\n[ ]"*"[^\n]*)*\n?"*/" {if(docs) printf("%s", yytext);} /*block starts with /*!, every new line start with " *" and last one is */
 ("///"[^\n]*\n)+"///"[^\n]*\n?      {if(docs) printf("%s", yytext);} /*block of at least two C++ comment lines, where each line starts with /// */
 ("//!"[^\n]*\n)+"//!"[^\n]*\n?      {if(docs) printf("%s", yytext);} /*block of at least two C++ comment lines, where each line starts with //! */
 "//".*                              {}
+"/"\\\n[ \t]*"/"\\\n.*        {}
+"//"[^\\\n]*\\\n.* {}
 "/*"([^*]|\*+[^*/])*\*+"/"          {}
 %%
 

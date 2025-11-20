@@ -1,10 +1,12 @@
 #include <iostream>
+#include <not//comment>
+#include "not//comment"
 using namespace std;
 
 /***/
 /** rtg */
 
-/*!vdfvf
+/** vdfvf
  * dfvf//\*
  * dfvdf
 */
@@ -22,6 +24,13 @@ using namespace std;
 
 int main(void){
     //comment
+
+    /\
+    /\
+    x = 10;
+
+    //\
+    x = 10;
     cout << "Pulapka \" \\
                 // a \
                 /* a */ \
@@ -31,6 +40,8 @@ int main(void){
     what up" <<endl;
 }
 
+// Comment\
+void nuke(void);
 
 /*
 Standard comment multine
