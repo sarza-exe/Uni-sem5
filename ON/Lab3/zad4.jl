@@ -7,8 +7,8 @@ pf = x -> cos(x)-0.5*x
 
 solutions = [
     mbisekcji(f, 1.5, 2.0, 0.5e-5, 0.5e-5),
-    mstycznych(f, pf, 1.5, 0.5e-5, 0.5e-5, 64),
-    msiecznych(f, 1.0, 2.0, 0.5e-5, 0.5e-5, 64)]
+    mstycznych(f, pf, 1.5, 0.5e-5, 0.5e-5, 32),
+    msiecznych(f, 1.0, 2.0, 0.5e-5, 0.5e-5, 32)]
 
 methods = ["bisekcji", "Newtona", "siecznych"]
 

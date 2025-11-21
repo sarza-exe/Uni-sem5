@@ -65,20 +65,21 @@ module Roots
     """
     function mstycznych(f,pf,x0::Float64, delta::Float64, epsilon::Float64, maxit::Int)
         deriv_err = sqrt(eps(Float64)) # 1.5e-8
+        v = Float64(f(x0))
+        if(abs(v) < epsilon)
+            return (x0,v,0,0)
+        end
         for i in 1:maxit
-            f0 = Float64(f(x0))
-            if(abs(f0) < epsilon)
-                return (x0,f0,i-1,0)
+            dv = Float64(pf(x0))
+            if(abs(dv) < deriv_err) # wartość f'(x) za bliska zeru by uniknąć dużych błędów przy dzieleniu
+                return (x0,v,i-1,2)
             end
-            f1 = Float64(pf(x0))
-            if(abs(f1) < deriv_err) # wartość f'(x) za bliska zeru by uniknąć dużych błędów przy dzieleniu
-                return (x0,f0,i-1,2)
+            x1 = x0 - (v/dv)
+            v = Float64(f(x1))
+            if(abs(x1-x0) < delta || abs(v) < epsilon)
+                return (x1,v,i,0)
             end
-            x1 = x0
-            x0 = x0 - (f0/f1)
-            if(abs(x1-x0) < delta)
-                return (x0,Float64(f(x0)),i,0)
-            end
+            x0 = x1
         end
         return (x0,Float64(f(x0)),maxit,1)
     end
@@ -101,20 +102,19 @@ module Roots
         f0 = Float64(f(x0))
         f1 = Float64(f(x1))
         for i in 1:maxit
-            divisor = f0-f1
-            if (abs(divisor) < eps(Float64))
-                return (x1,Float64(f(x1)),i-1,2)
+            if(abs(f0) > abs(f1))
+                x0, x1 = x1, x0
+                f0, f1 = f1, f0
             end
-            xn = (f0*x1 - f1*x0)/(f0 - f1)
-            fn = Float64(f(xn))
-            if( abs(fn) < epsilon || abs(xn-x1) < delta)
-                return(xn, fn, i, 0)
+            s = (x1-x0)/(f1-f0)
+            x1 = x0
+            f1 = f0
+            x0 = x0 - f0*s
+            f0 = Float64(f(x0))
+            if( abs(f0) < epsilon || abs(x1-x0) < delta)
+               return(x0, f0, i, 0)
             end
-            x0 = x1
-            f0 = f1
-            x1 = xn
-            f1 = fn
         end
-        return (xn, fn, maxit, 1)
+        return (x0, f0, maxit, 1)
     end
 end
