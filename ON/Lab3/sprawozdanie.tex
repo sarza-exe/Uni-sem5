@@ -1,0 +1,240 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{titlesec}
+
+% Ustawienia marginesów
+\geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=25mm,
+ top=25mm,
+}
+
+% Dane autora
+\title{Sprawozdanie z Listy nr 3}
+\author{Sara Żyndul \\ 279686}
+\date{}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ---------------- ZADANIE 1 ----------------
+\section{Zadanie 1}
+
+\subsection{Opis}
+Celem zadania było zaimplementowanie funkcji rozwiązującej równanie $f(x) = 0$ metodą \textbf{bisekcji} (połowienia przedziału). Metoda ta opiera się na twierdzeniu Bolzano-Cauchy'ego. Algorytm dzieli przedział $[a, b]$ (wartości początkowe $[a, b]$ takie, że funkcja f ma różny znak na końcach) na połowy i wybiera ten podprzedział, na końcach którego funkcja przyjmuje wartości przeciwnych znaków, co gwarantuje istnienie miejsca zerowego wewnątrz.
+
+Metoda bisekcji jest metodą zbieżną globalnie (o ile spełnione są założenia początkowe o zmianie znaku), jednak jej zbieżność jest liniowa, co oznacza stosunkowo wolne dochodzenie do wyniku w porównaniu do innych metod.
+
+Rozwiązanie znajduje się w pliku \texttt{iterationRoots.jl}. Poprawność implementacji została zweryfikowana testami jednostkowymi w pliku \texttt{runTests.jl}.
+
+\subsection{Wyniki}
+Testy potwierdziły poprawność działania metody.
+\begin{verbatim}
+Test Summary:        | Pass  Total  Time
+mbisekcji (bisekcji) |   11     11  0.1s
+\end{verbatim}
+% ---------------- ZADANIE 2 ----------------
+\section{Zadanie 2}
+
+\subsection{Opis}
+Zadanie polegało na zaimplementowaniu metody \textbf{Newtona} (stycznych). Metoda ta jest algorytmem iteracyjnym, w którym kolejne przybliżenie pierwiastka wyznaczane jest ze wzoru:
+$$ x_{k+1} = x_k - \frac{f(x_k)}{f'(x_k)} $$
+Metoda Newtona charakteryzuje się szybką zbieżnością (kwadratową) w bliskim otoczeniu pierwiastka. Wymaga jednak znajomości analitycznej postaci pochodnej oraz dobrego doboru punktu startowego $x_0$.
+Metoda wymaga podania funkcji oraz jej pochodnej. 
+
+Implementacja znajduje się w pliku \texttt{iterationRoots.jl}, a testy w \texttt{runTests.jl}.
+
+\subsection{Wyniki}
+\begin{verbatim}
+Test Summary:        | Pass  Total  Time
+mstycznych (Newtona) |    9      9  0.0s
+\end{verbatim}
+
+% ---------------- ZADANIE 3 ----------------
+\section{Zadanie 3}
+
+\subsection{Opis}
+Zadanie obejmowało implementację metody \textbf{siecznych}. Jest to modyfikacja metody Newtona, w której pochodna $f'(x_k)$ jest przybliżana ilorazem różnicowym na podstawie dwóch poprzednich punktów iteracji:
+$$ x_{k+1} = x_k - f(x_k) \frac{x_k - x_{k-1}}{f(x_k) - f(x_{k-1})} $$
+Metoda siecznych eliminuje konieczność obliczania pochodnej, jednocześnie posiadając rząd zbieżności nadliniowy (około 1.618). Jest to dobry kompromis między metodą bisekcji a metodą Newtona.
+
+Kod źródłowy znajduje się w \texttt{iterationRoots.jl}, a testy w \texttt{runTests.jl}.
+
+\subsection{Wyniki}
+\begin{verbatim}
+Test Summary:          | Pass  Total  Time
+msiecznych (siecznych) |    8      8  0.0s
+\end{verbatim}
+% ---------------- ZADANIE 4 ----------------
+\section{Zadanie 4}
+
+\subsection{Opis}
+Zadanie polegało na znalezieniu pierwiastka równania:
+$$ f(x) = \sin(x) - (0.5x)^2 = 0 $$
+Należało zastosować metody bisekcji, Newtona i siecznych z zadanymi parametrami dokładności $\delta = \frac{1}{2}10^{-5}, \epsilon = \frac{1}{2}10^{-5}$.
+
+\subsection{Wyniki}
+Poniższa tabela przedstawia wyniki uzyskane dla poszczególnych metod (gdzie $r$ to przybliżony pierwiastek, a $it$ to liczba iteracji).
+
+\begin{table}[H]
+\centering
+\caption{Porównanie metod dla funkcji z Zadania 4}
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+Metoda & Wynik $r$ & Wartość $f(r)$ & Iteracje & Błąd \\
+\midrule
+Bisekcji & $1.933753967$ & $-2.70 \times 10^{-7}$ & 16 & 0 \\
+Newtona & $1.933753779$ & $-2.24 \times 10^{-8}$ & 4 & 0 \\
+Siecznych & $1.933753644$ & $1.56 \times 10^{-7}$ & 4 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Wnioski}
+\begin{itemize}
+    \item Wszystkie metody zbiegły do tego samego wyniku (w granicach błędu).
+    \item Metody Newtona i siecznych wymagały znacznie mniejszej liczby iteracji (4) niż metoda bisekcji (16), co potwierdza ich wyższy rząd zbieżności.
+    \item Metoda bisekcji, mimo wolniejszej zbieżności, zagwarantowała wynik w zadanym przedziale.
+\end{itemize}
+
+% ---------------- ZADANIE 5 ----------------
+\section{Zadanie 5}
+
+\subsection{Opis}
+Celem zadania było wyznaczenie punktów przecięcia wykresów funkcji $y = 3x$ oraz $y = e^x$. Problem można sprowadzić do znalezienia miejsc zerowych funkcji:
+$$ g(x) = 3x - e^x $$
+Przedziały poszukiwań ustalono na podstawie analizy wykresu funkcji. Zastosowano metodę bisekcji z dokładnością $10^{-4}$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{plot1.png}
+\caption{Wizualizacja funkcji $g(x) = 3x - e^x $. Widzimy, że funkcja ma dwa pierwiastki, jeden w przedziale $[0.5,1.0]$, a drugi w przedziale $[1.0,2.0]$.}
+\end{figure}
+
+\subsection{Wyniki}
+Znaleziono dwa punkty przecięcia w wybranych przedziałach.
+
+\begin{table}[H]
+\centering
+\caption{Miejsca zerowe funkcji $3x - e^x$}
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+Przedział & Przybliżenie $r$ & Wartość $g(r)$ & Iteracje \\
+\midrule
+$[0.5, 1.0]$ & $0.619140625$ & $9.06 \times 10^{-5}$ & 8 \\
+$[1.0, 2.0]$ & $1.512084961$ & $7.61 \times 10^{-5}$ & 13 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Wnioski}
+Funkcja posiada dwa miejsca zerowe. Metoda bisekcji poradziła sobie z ich znalezieniem po odpowiednim dobraniu przedziałów startowych.
+
+% ---------------- ZADANIE 6 ----------------
+% ---------------- ZADANIE 6 ----------------
+\section{Zadanie 6}
+
+\subsection{Opis}
+Zadanie polegało na znalezieniu miejsc zerowych funkcji:
+$$ f_1(x) = e^{1-x} - 1 $$
+$$ f_2(x) = x e^{-x} $$
+Wymagana dokładność wynosiła $\delta = 10^{-5}, \epsilon = 10^{-5}$.
+
+Analiza funkcji:
+\begin{itemize}
+    \item Funkcja $f_1(x)$ posiada jedno miejsce zerowe dla $x=1$. Jest monotoniczna malejąca, a jej pochodna $f'_1(x) = -e^{1-x}$ dąży do 0 dla $x \to \infty$.
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{plot2.png}
+    \end{figure}
+    \item Funkcja $f_2(x)$ posiada jedno miejsce zerowe dla $x=0$. Posiada maksimum lokalne dla $x=1$ (gdzie pochodna się zeruje). Dla $x \to \infty$ funkcja asymptotycznie zbliża się do zera od wartości dodatnich.
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{plot3.png}
+    \end{figure}
+\end{itemize}
+
+\subsection{Wyniki}
+
+\textbf{Funkcja $f_1(x) = e^{1-x} - 1$ (miejsce zerowe $x=1$)}
+
+W poniższej tabeli zestawiono wyniki dla różnych parametrów startowych, w tym przypadki skrajne (bardzo duże przedziały, punkty startowe dalekie od pierwiastka).
+
+\begin{table}[H]
+\centering
+\caption{Wyniki dla funkcji $f_1$}
+\begin{tabular}{@{}l l c c c@{}}
+\toprule
+Metoda & Parametry & Wynik $r$ & Iteracje & Uwagi \\
+\midrule
+Bisekcji & $[-1, 3]$ & $1.0$ & 1 & Trafienie w punkt \\
+Bisekcji & $[-1, 2]$ & $0.999992$ & 17 & \\
+Bisekcji & $[-10^6, 10^6]$ & $1.000007$ & 33 & Duży przedział \\
+Newtona & $x_0 = -1$ & $0.999992$ & 5 & \\
+Newtona & $x_0 = 1$ & $1.0$ & 0 & Start w zerze \\
+Newtona & $x_0 = 4$ & $0.999999$ & 21 & Wolniejsza zbieżność \\
+Newtona & $x_0 = 8$ & NaN & 255 & Błąd (przekroczono limit) \\
+Newtona & $x_0 = 1000$ & $1000$ & 0 & Pochodna bliska $0$ \\
+Siecznych & $[-2, 0]$ & $0.9999949$ & 6 & \\
+Siecznych & $[-100, -90]$ & $0.999999$ & 137 & Bardzo wolna zbieżność \\
+Siecznych & $[100, 1000]$ & NaN & 255 & Błąd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Funkcja $f_2(x) = x e^{-x}$ (miejsce zerowe $x=0$)}
+
+Tabela przedstawia zachowanie metod w pobliżu ekstremum oraz dla dużych argumentów.
+
+\begin{table}[H]
+\centering
+\caption{Wyniki dla funkcji $f_2$}
+\begin{tabular}{@{}l l c c c@{}}
+\toprule
+Metoda & Parametry & Wynik $r$ & Iteracje & Uwagi \\
+\midrule
+Bisekcji & $[-1, 3]$ & $0.0$ & 2 & \\
+Bisekcji & $[-1, 2]$ & $7.6 \times 10^{-6}$ & 17 & \\
+Bisekcji & $[-10^6, 2]$ & $0.000009$ & 35 & Stabilna zbieżność \\
+Newtona & $x_0 = -1$ & $-3.06 \times 10^{-7}$ & 5 & \\
+Newtona & $x_0 = 1$ & $1.0$ & 0 & Błąd (dzielenie przez 0) \\
+Newtona & $x_0 = 1.5$ & $14.7874$ & 10 & Zbieżność do fałszywego $0$ \\
+Newtona & $x_0 = 8$ & $14.6368$ & 6 & Zbieżność do fałszywego $0$ \\
+Newtona & $x_0 = 1000$ & $1000.0$ & 0 & Wartość $f_2$ bliska 0 \\
+Siecznych & $[-2, 0]$ & $0$ & 1 & \\
+Siecznych & $[-100, 90]$ & $-2.3 \times 10^{-6}$ & 142 & Wolna zbieżność \\
+Siecznych & $[0.5, 10000]$ & $10000.0$ & 1 & Wartość $f_2$ bliska 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Wnioski}
+Analiza wyników pozwala na sformułowanie następujących spostrzeżeń:
+
+\begin{enumerate}
+    \item \textbf{Problem znikającej pochodnej (Metoda Newtona dla $f_1$):}
+    Dla funkcji $f_1(x) = e^{1-x}-1$, przy dużych wartościach $x$ (np. $x=1000$), wykres funkcji staje się płaski (asymptota pozioma $y=-1$). Pochodna funkcji $f'(x) = -e^{1-x}$ przyjmuje wartości bliskie zeru. Algorytm Newtona kończy działanie z błędem (`err=2`), ponieważ nie jest w stanie wyznaczyć kolejnego kroku aproksymacji (dzielenie przez wartość bliską zeru).
+
+    \item \textbf{Zjawisko fałszywego pierwiastka dla $f_2$:}
+    Dla funkcji $f_2(x) = xe^{-x}$ sytuacja jest inna. Dla dużych argumentów dodatnich (np. $x=1000$, a nawet $x \approx 14.6$), funkcja asymptotycznie zbliża się do osi OX. Wartości funkcji są tam na tyle małe (rzędu $10^{-6}$ lub mniej), że spełniają warunek stopu $|f(x)| < \epsilon$. Algorytm błędnie uznaje te punkty za miejsca zerowe (`err=0`), mimo że faktyczne miejsce zerowe znajduje się w $x=0$. Jest to efekt ograniczonej precyzji arytmetyki oraz kształtu badanej funkcji.
+
+    \item \textbf{$x_0=1$ w metodzie Newtona:}
+    Dla funkcji $f_2$ w punkcie $x_0=1$ pochodna wynosi dokładnie 0 (maksimum lokalne). Metoda Newtona zawodzi natychmiastowo z powodu dzielenia przez zero.
+
+    \item \textbf{Porównanie metod:}
+    Metoda bisekcji okazała się najbardziej stabilna i przewidywalna – poprawnie zbiegała w każdym badanym przedziale, o ile zawierał on pierwiastek. Metoda siecznych wykazywała dużą wrażliwość na dobór punktów startowych – w przypadku $f_1$ na przedziale $[-100, -90]$ zbieżność była skrajnie wolna (137 iteracji) z powodu "płaskiego" przebiegu funkcji w tym rejonie.
+\end{enumerate}
+
+\end{document}

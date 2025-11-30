@@ -1,9 +1,8 @@
 # Sara Żyndul 279686
 (@isdefined Roots) == false ? include("iterationRoots.jl") : nothing
 using .Roots
-
+    
 f = x -> 3*x-exp(1)^x
-pf = x -> cos(x)-0.5*x
 
 solution = mbisekcji(f, 0.5, 1.0, 1e-4, 1e-4)
 
