@@ -154,7 +154,8 @@ if __name__ == "__main__":
     while True:
         try:
             line = input()
-        except EOFError:
+        except EOFError and KeyboardInterrupt:
+            print()
             break
         if not line: continue
         if line.rstrip().endswith('\\'):
