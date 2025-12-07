@@ -1,0 +1,6 @@
+plots/
+test.jl
+*.aux
+*.log
+*.out
+*.toc
