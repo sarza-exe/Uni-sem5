@@ -109,8 +109,8 @@ for family in FAMILIES:
                 "Instance": instance,
                 "Param": param,
                 "Algorithm": algo,
-                "Time_Min": avg_min,        # Czas dla źródła min
-                "Time_Avg_Rand": avg_rand   # Średni czas dla 5 losowych
+                "Time_Min": avg_min,
+                "Time_Avg_Rand": avg_rand
             })
 
 df_time = pd.DataFrame(data_time)
@@ -123,7 +123,6 @@ else:
 # --- GENEROWANIE WYKRESÓW (ZMODYFIKOWANE) ---
 print("Generowanie wykresów...")
 
-# Definicja typów wykresów do wygenerowania
 plot_types = [
     {"col": "Time_Min",      "suffix": "min",  "title": "Czas (źródło o min. indeksie)"},
     {"col": "Time_Avg_Rand", "suffix": "rand", "title": "Czas (średnia z 5 losowych źródeł)"}
@@ -135,42 +134,50 @@ for family in FAMILIES:
         continue
     
     # Sortowanie danych
-    if family == "USA-road-d":
-         df_fam = df_fam.sort_values(by="Param")
-    else:
-         df_fam = df_fam.sort_values(by="Param")
+    df_fam = df_fam.sort_values(by="Param")
     
-    # Generujemy DWA wykresy dla każdej rodziny (Min i Rand)
     for p_type in plot_types:
         col_name = p_type["col"]
         suffix = p_type["suffix"]
         title_desc = p_type["title"]
 
+        # Inicjalizacja figury
         plt.figure(figsize=(10, 6))
         
-        for algo in ["dijkstra", "dial", "radix"]:
-            subset = df_fam[df_fam["Algorithm"] == algo]
-            # Usuwamy wiersze gdzie brakuje danych dla konkretnej kolumny (np. MLE)
-            subset = subset.dropna(subset=[col_name])
-            
-            if not subset.empty:
-                plt.plot(subset["Param"], subset[col_name], marker='o', label=algo)
-        
-        plt.title(f"{family} - {title_desc}")
-        plt.ylabel("Czas [s]")
-        
+        # === ZMIANA: WYKRES SŁUPKOWY DLA USA-ROAD-D ===
         if family == "USA-road-d":
+            # Pivotujemy tabelę tak, aby Algorytmy były kolumnami (dla legendy), a Param (regiony) indeksem (oś X)
+            pivot_df = df_fam.pivot(index="Param", columns="Algorithm", values=col_name)
+            
+            # Generujemy wykres słupkowy przy użyciu wbudowanej metody pandas
+            # 'ax=plt.gca()' rysuje na bieżącej figurze matplotlib
+            pivot_df.plot(kind='bar', width=0.8, ax=plt.gca())
+            
+            plt.title(f"{family} - {title_desc}")
+            plt.ylabel("Czas [s]")
             plt.xlabel("Region")
-            plt.xticks(rotation=45)
+            plt.xticks(rotation=45) # Obracamy etykiety regionów
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+            
         else:
+            # === DLA INNYCH RODZIN: STANDARDOWY WYKRES LINIOWY ===
+            for algo in ["dijkstra", "dial", "radix"]:
+                subset = df_fam[df_fam["Algorithm"] == algo]
+                subset = subset.dropna(subset=[col_name])
+                
+                if not subset.empty:
+                    plt.plot(subset["Param"], subset[col_name], marker='o', label=algo)
+            
+            plt.title(f"{family} - {title_desc}")
+            plt.ylabel("Czas [s]")
             plt.xlabel("Parametr (n lub log C)")
             plt.yscale("log") # Skala logarytmiczna
-            
-        plt.legend()
-        plt.grid(True)
+            plt.legend()
+            plt.grid(True)
+
         plt.tight_layout()
         
-        # Zapis do pliku np. plot_Long-C_min.png
+        # Zapis do pliku
         filename = f"plot_{family}_{suffix}.png"
         plt.savefig(os.path.join(OUTPUT_DIR, filename))
         plt.close()

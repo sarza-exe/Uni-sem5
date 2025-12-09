@@ -11,6 +11,7 @@
 \usepackage{subcaption}
 \usepackage{array}
 \usepackage{xcolor}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
 
 % Ustawienia marginesów
 \geometry{
@@ -21,26 +22,72 @@
 }
 
 \title{\textbf{Laboratorium 3: \\Porównanie implementacji algorytmu Dijkstry}}
-\author{Algorytmy Optymalizacji Dyskretnej\\Sara Żyndul 279686}
+\author{Algorytmy Optymalizacji Dyskretnej\\Sara Żyndul\\279686}
 \date{\today}
 
 \begin{document}
 
 \maketitle
+\bigskip
 
 \section{Opis implementacji i analiza złożoności}
 
 W ramach laboratorium zaimplementowano trzy warianty algorytmu wyznaczania najkrótszych ścieżek w grafie skierowanym z nieujemnymi wagami krawędzi. Poniżej przedstawiono szczegóły implementacyjne oraz analizę złożoności, gdzie $n$ oznacza liczbę wierzchołków, $m$ liczbę krawędzi, a $C$ maksymalną wagę krawędzi.
 
+\newpage
 \subsection{Algorytm Dijkstry (Wariant podstawowy)}
 Wykorzystano standardową implementację algorytmu Dijkstry z użyciem kolejki priorytetowej typu Min-Heap.
 \begin{itemize}
     \item \textbf{Struktura danych:} Użyto kontenera \texttt{std::priority\_queue} z biblioteki standardowej C++, przechowującego pary \texttt{(dystans, wierzchołek)}.
     \item \textbf{Implementacja:} Zastosowano podejście \textit{lazy deletion}. Zamiast kosztownej operacji \texttt{decrease-key}, nowe, lepsze odległości są dodawane do kolejki jako nowe elementy. Podczas zdejmowania elementu z wierzchołka kopca sprawdzane jest, czy pobrany dystans jest aktualny (tj. równy \texttt{dist[u]}). Jeśli nie, element jest ignorowany.
-    \item \textbf{Złożoność czasowa:} $\mathcal{O}(m \log n)$. W najgorszym przypadku do kolejki może trafić $m$ elementów (każda relaksacja krawędzi), a operacje na kopcu zajmują czas logarytmiczny.
+    \item \textbf{Złożoność czasowa:} W implementacji została wykorzystana \texttt{std::priority\_queue}, dla której złożoność \texttt{extract\_min} jest logarytmiczna, więc złożoność czasowa algorytmu Dijkstry to $\mathcal{O}((m+n) \log n)$. W najgorszym przypadku do kolejki może trafić $m$ elementów (każda relaksacja krawędzi).
     \item \textbf{Złożoność pamięciowa:} $\mathcal{O}(n + m)$ (graf + tablica dystansów + kolejka).
 \end{itemize}
 
+\subsection*{Pseudokod algorytmu}
+\begin{algorithm}[H]
+\SetKwInput{KwData}{Wejście}
+\SetKwInput{KwResult}{Wyjście}
+\SetKw{KwOr}{or}
+\SetKw{KwAnd}{and}
+\SetKw{KwContinue}{continue}
+\SetKw{KwReturn}{return}
+
+\KwData{Graf $G(V, E)$, wierzchołek startowy $s$, cel $target$}
+\KwResult{Tablica $dist[]$ z najkrótszymi odległościami od $s$}
+
+\ForEach{$v \in V$}{
+    $dist[v] \leftarrow \infty$\;
+}
+$dist[s] \leftarrow 0$\;
+$PQ \leftarrow$ pusta kolejka priorytetowa (Min-Heap)\;
+$PQ.push(\{0, s\})$\;
+
+\While{$PQ$ nie jest pusta}{
+    $\{d, u\} \leftarrow PQ.top()$\;
+    $PQ.pop()$\;
+
+    \If{$u == target$}{
+        \KwReturn\;
+    }
+
+    \If{$d > dist[u]$}{
+        \KwContinue \tcp*{Lazy deletion}
+    }
+
+    \ForEach{krawędź $e \in G.adj[u]$}{
+        $v \leftarrow e.target$\;
+        $w \leftarrow e.weight$\;
+        \If{$dist[u] + w < dist[v]$}{
+            $dist[v] \leftarrow dist[u] + w$\;
+            $PQ.push(\{dist[v], v\})$\;
+        }
+    }
+}
+\caption{Algorytm Dijkstry}
+\end{algorithm}
+
+\newpage
 \subsection{Algorytm Diala}
 Algorytm ten jest optymalizacją Dijkstry dla grafów o całkowitych, niewielkich wagach krawędzi.
 \begin{itemize}
@@ -50,8 +97,57 @@ Algorytm ten jest optymalizacją Dijkstry dla grafów o całkowitych, niewielkic
     \item \textbf{Złożoność pamięciowa:} $\mathcal{O}(n + C)$. Wymaga alokacji pamięci zależnej liniowo od maksymalnej wagi krawędzi.
 \end{itemize}
 
+\subsection*{Pseudokod algorytmu}
+\begin{algorithm}[H]
+\SetKwInput{KwData}{Wejście}
+\SetKwInput{KwResult}{Wyjście}
+\SetKw{KwContinue}{continue}
+\SetKw{KwReturn}{return}
+\SetKw{KwBreak}{break}
+
+\KwData{Graf $G$, źródło $s$, max waga $C$}
+\KwResult{Tablica $dist[]$}
+
+$B\_size \leftarrow C + 1$\;
+Inicjalizacja $buckets[0 \dots B\_size-1]$\;
+\ForEach{$v \in V$}{ $dist[v] \leftarrow \infty$ }
+$dist[s] \leftarrow 0$\;
+$buckets[0].push\_back(s)$\;
+$current\_dist \leftarrow 0$, $num\_elements \leftarrow 1$\;
+
+\While{$num\_elements > 0$}{
+    \tcp{Przesunięcie kursora do niepustego kubełka}
+    \While{$buckets[current\_dist \mod B\_size]$ jest pusty}{
+        $current\_dist \leftarrow current\_dist + 1$\;
+    }
+
+    $idx \leftarrow current\_dist \mod B\_size$\;
+    
+    \While{$buckets[idx]$ nie jest pusty}{
+        $u \leftarrow buckets[idx].back()$\;
+        $buckets[idx].pop\_back()$\;
+        $num\_elements \leftarrow num\_elements - 1$\;
+
+        \If{$u == target$}{ \KwReturn }
+        \If{$dist[u] < current\_dist$}{ \KwContinue }
+
+        \ForEach{krawędź $e \in G.adj[u]$}{
+            $v \leftarrow e.target$, $w \leftarrow e.weight$\;
+            \If{$dist[u] + w < dist[v]$}{
+                $dist[v] \leftarrow dist[u] + w$\;
+                $buckets[dist[v] \mod B\_size].push\_back(v)$\;
+                $num\_elements \leftarrow num\_elements + 1$\;
+            }
+        }
+    }
+    $current\_dist \leftarrow current\_dist + 1$\;
+}
+\caption{Algorytm Diala}
+\end{algorithm}
+
+\newpage
 \subsection{Algorytm Radix Heap}
-Algorytm ten łączy zalety Dijkstry i Diala, wykorzystując własności reprezentacji binarnej liczb.
+Algorytm ten łączy zalety Dijkstry i Diala, wykorzystując własności reprezentacji binarnej liczb. Wielkości kubełków są tutaj kolejnymi potęgami dwójki: ${1,1,2,4,8,...}$
 \begin{itemize}
     \item \textbf{Struktura danych:} Użyto statycznej liczby kubełków ($64$ dla 64-bitowego typu long long), gdzie zakresy kubełków rosną wykładniczo.
     \item \textbf{Implementacja:} Indeks kubełka wyznaczany jest na podstawie pozycji najbardziej znaczącego różniącego się bitu (MSB) między ostatnio zdjętym dystansem a dystansem kandydata. Do szybkiego obliczania MSB wykorzystano funkcję wbudowaną kompilatora \texttt{\_\_builtin\_clzll} (Count Leading Zeros). Zastosowano mechanizm redystrybucji elementów z wyższych kubełków do niższych.
@@ -59,37 +155,190 @@ Algorytm ten łączy zalety Dijkstry i Diala, wykorzystując własności repreze
     \item \textbf{Złożoność pamięciowa:} $\mathcal{O}(n + m)$. Niezależna liniowo od wartości $C$.
 \end{itemize}
 
+\subsection*{Pseudokod algorytmu}
+\begin{algorithm}[H]
+\SetKwInput{KwData}{Wejście}
+\SetKwInput{KwResult}{Wyjście}
+\SetKwFunction{FBucket}{get\_bucket\_index}
+\SetKw{KwContinue}{continue}
+\SetKw{KwReturn}{return}
+
+\SetKwProg{Fn}{Function}{:}{}
+\Fn{\FBucket{$last, key$}}{
+    $diff \leftarrow (last \oplus key)$\;
+    \lIf{$diff == 0$}{\KwReturn $0$}
+    \KwReturn $64 - \text{clz}(diff)$ \tcp*{most significant bit index}
+}
+
+\KwData{Graf $G$, źródło $s$}
+Inicjalizacja $buckets[0 \dots 64]$\;
+$last\_dist \leftarrow 0$, $size \leftarrow 0$\;
+\ForEach{$v \in V$}{ $dist[v] \leftarrow \infty$ }
+$dist[s] \leftarrow 0$, $buckets[0].push(\{0, s\})$, $size \leftarrow 1$\;
+
+\While{$size > 0$}{
+    $idx \leftarrow$ pierwszy niepusty indeks w $buckets$\;
+    
+    \If{$idx > 0$}{
+        $min\_key \leftarrow \min_{(k, u) \in buckets[idx]} k$\;
+        $last\_dist \leftarrow min\_key$\;
+        \ForEach{element $\{k, u\} \in buckets[idx]$}{
+            \If{$k == dist[u]$}{
+                $new\_idx \leftarrow \FBucket(last\_dist, k)$\;
+                $buckets[new\_idx].push(\{k, u\})$\;
+            } \Else { $size \leftarrow size - 1$ }
+        }
+        $buckets[idx].clear()$\;
+        \KwContinue\;
+    }
+
+    \While{$buckets[0]$ nie jest pusty}{
+        $\{k, u\} \leftarrow buckets[0].back()$, $buckets[0].pop\_back()$\;
+        $size \leftarrow size - 1$\;
+        
+        \If{$k \neq dist[u]$}{ \KwContinue }
+        \If{$u == target$}{ \KwReturn }
+
+        \ForEach{krawędź $e \in G.adj[u]$}{
+            $nd \leftarrow dist[u] + e.weight$\;
+            \If{$nd < dist[v]$}{
+                $dist[v] \leftarrow nd$\;
+                $b \leftarrow \FBucket(last\_dist, nd)$\;
+                $buckets[b].push(\{nd, v\})$, $size \leftarrow size + 1$\;
+            }
+        }
+    }
+}
+\caption{Algorytm Radix Heap}
+\end{algorithm}
+
 \newpage
 \section{Wyniki eksperymentów}
 
 \subsection{Poprawność i długości ścieżek}
-Tabela 1 przedstawia wyniki dla największych instancji testowych z każdej rodziny. Porównano długości znalezionych ścieżek między wierzchołkiem o najmniejszym i największym indeksie (Min-Max) oraz dla 4 losowych par.
+Poniższa tabela przedstawia wyniki dla największych instancji testowych z każdej rodziny. Porównano długości znalezionych ścieżek między wierzchołkiem o najmniejszym i największym indeksie (Min-Max) oraz dla 4 losowych par.
+
+Zgodność wyników potwierdza poprawność implementacji wszystkich trzech algorytmów.
 
 \begin{table}[H]
 \centering
-\caption{Długości najkrótszych ścieżek dla pierwszego i ostatniego wierzchołka. Oznaczenie \textbf{MLE} (Memory Limit Exceeded) wskazuje błąd braku pamięci dla algorytmu Diala. W każdym z tych trzech przypadków masymalna waga to około $1000000000=10^9$ co wymagałoby alokacji 24 GB pamięci RAM.}
+\caption{Długości najkrótszych ścieżek dla pierwszego i ostatniego wierzchołka. Oznaczenie \textbf{MLE} (Memory Limit Exceeded) wskazuje błąd braku pamięci dla algorytmu Diala. W każdym z tych trzech przypadków masymalna waga to około $10^9$, co wymagałoby alokacji 24 GB pamięci RAM.}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}l l l p{6cm} @{}}
+\begin{tabular}{@{}l l p{6cm} @{}}
 \toprule
-\textbf{Rodzina} & \textbf{Instancja} & \textbf{Dijkstra / Radix} & \textbf{Dial} \\
+\textbf{Instancja} & \textbf{Dijkstra / Radix} & \textbf{Dial} \\
 \midrule
-Random4-n & Random4-n.21.0 & \textbf{MM:} 9051281 \newline \textbf{Rand:} 8021753, 7962615, 11520120, 7944933 & Wyniki zgodne \\
+
+Random4-n.21.0 &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max:} 9051281 \\
+\textbf{Rand:} 8021753, 7962615, 11520120, 7944933
+\end{tabular}
+& Wyniki zgodne \\
 \midrule
-Random4-C & Random4-C.15.0 & \textbf{MM:} 3471241820 \newline \textbf{Rand:} 4303132782, 3285449479, 3923515585, 4834216768 & \textbf{MLE} (Brak wyniku) \\
+
+Random4-C.15.0 &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max} 3471241820 \\
+\textbf{Rand:} 4303132782, 3285449479, 3923515585, 4834216768
+\end{tabular}
+& \textbf{MLE} \\
 \midrule
-Long-n & Long-n.21.0 & \textbf{MM:} 31336751771 \newline \textbf{Rand:} 4137488546, 20534900152, 46406387800, 63037605316 & Wyniki zgodne \\
+
+Long-n.21.0 &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max} 31336751771 \\
+\textbf{Rand:} 4137488546, 20534900152, 46406387800, 63037605316
+\end{tabular}
+& Wyniki zgodne \\
 \midrule
-Square-n & Square-n.21.0 & \textbf{MM:} 714640488 \newline \textbf{Rand:} 627400780, 773584334, 820931845, 312060678 & Wyniki zgodne \\
+
+Square-n.21.0 &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max} 714640488 \\
+\textbf{Rand:} 627400780, 773584334, 820931845, 312060678
+\end{tabular}
+& Wyniki zgodne \\
 \midrule
-Long-C & Long-C.15.0 & \textbf{MM:} 1308259008765 \newline \textbf{Rand:} 1122339012956, 6279817984398, 629828042459, 10523381128436 & \textbf{MLE} (Brak wyniku) \\
+
+Long-C.15.0 &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max} 1308259008765 \\
+\textbf{Rand:} 1122339012956, 6279817984398, 629828042459, 10523381128436
+\end{tabular}
+& \textbf{MLE} \\
 \midrule
-Square-C & Square-C.15.0 & \textbf{MM:} 122219500320 \newline \textbf{Rand:} 109667679059, 239894218968, 183454171539, 261947371811 & \textbf{MLE} (Brak wyniku) \\
+
+Square-C.15.0 &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max} 122219500320 \\
+\textbf{Rand:} 109667679059, 239894218968, 183454171539, 261947371811
+\end{tabular}
+& \textbf{MLE} \\
 \midrule
-USA-road-d & USA-road-d.W & \textbf{MM:} 13133160 \newline \textbf{Rand:} 8070957, 3015305, 5366628, 12272763 & Wyniki zgodne \\
+
+USA-road-d.W &
+\begin{tabular}[t]{@{}l@{}}
+\textbf{Min-Max} 13133160 \\
+\textbf{Rand:} 8070957, 3015305, 5366628, 12272763
+\end{tabular}
+& Wyniki zgodne \\
 \bottomrule
+
 \end{tabular}%
 }
 \end{table}
+
+
+\newpage
+
+
+\subsection{Czasy znajdywania ścieżek}
+Tabela 2 przedstawia czas działania algorytmów dla największych instancji testowych z każdej rodziny. Czas I - czasy znalezienia ścieżek między wierzchołkiem o najmniejszym i największym indeksie (Min-Max). Czas II - średnie czasy znalezienia ścieżek dla 4 losowych par.
+
+\bigskip
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrr}
+\hline
+Rodzina - Algorytm & Czas I (ms) & Czas II (ms) \\
+\hline
+Long-C - Dijkstra        & 28.04     & 114.98   \\
+Long-C - Dial            & \textbf{MLE}   & \textbf{MLE}  \\
+Long-C - RadixHeap       & 31.6      & 160.58   \\
+Long-n - Dijkstra        & 291.2     & 216.61   \\
+Long-n - Dial            & 95545.73  & 117392.49\\
+Long-n - RadixHeap       & 308.11    & 265.49   \\
+Random4-C - Dijkstra     & 139.37    & 210.35   \\
+Random4-C - Dial         & \textbf{MLE}   & \textbf{MLE}  \\
+Random4-C - RadixHeap    & 109.35    & 145.75   \\
+Random4-n - Dijkstra     & 547.91    & 487.54   \\
+Random4-n - Dial         & 860.5     & 992.31   \\
+Random4-n - RadixHeap    & 371.79    & 322.88   \\
+Square-C - Dijkstra      & 105.87    & 129.67   \\
+Square-C - Dial          & \textbf{MLE}   & \textbf{MLE}  \\
+Square-C - RadixHeap     & 112.87    & 145.99   \\
+Square-n - Dijkstra      & 257.69    & 239.23   \\
+Square-n - Dial          & 2750.22   & 2300.17  \\
+Square-n - RadixHeap     & 255.78    & 219.63   \\
+USA-road-d - Dijkstra    & 3253.2    & 2272.93  \\
+USA-road-d - Dial        & 2860.24   & 2134.75  \\
+USA-road-d - RadixHeap   & 2845.07   & 2036.93  \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Obserwacje:}
+\begin{itemize}
+    \item Widzimy, że algorytm Radix Heap radzi sobie wyraźnie lepiej od Dijkstry przy grafach losowych oraz przy grafach z rodziny USA-road-d.
+    \item Jeśli algorytmowi Diala udało się zaalokować wystarczającą ilość pamięci to za wyjątkiem rodziny USA-road-d zawsze był najwolniejszym algorytmem. Widać to szczególnie na przykładzie rodziny Long-n, dla której wartości C rosną proporcjonalnie do ilości wierzchołków.
+    \item Dla grafów z rodziny USA-road-d algorytm Diala radzi sobie lepiej od algorytmu Dijkstry, jednak wciąż jest wolniejszy od Radix Heap. Zauważmy, że jest to jedyna z testowanych rodzin z relatywnie małymi wartościami C.
+    \item Algorytmy Dijkstry i Radix Heap wykazują się wysoką stabilnością.
+\end{itemize}
+
+\newpage
 
 \subsection{Wykresy czasu działania}
 
@@ -143,7 +392,7 @@ Poniższe wykresy prezentują zależność czasu działania od parametru generat
 \end{figure}
 
 
-\section{interpretacja wyników}
+\section{Interpretacja wyników}
 
 Przeprowadzone eksperymenty potwierdzają teoretyczne różnice w złożoności zaimplementowanych algorytmów.
 
@@ -165,44 +414,16 @@ Przeprowadzone eksperymenty potwierdzają teoretyczne różnice w złożoności 
     Algorytm Dijkstry z kolejką priorytetową jest najbardziej uniwersalnym rozwiązaniem, odpornym na charakterystykę wag. Radix Heap stanowi doskonałą alternatywę dla wag całkowitych, oferując wydajność zbliżoną do liniowej. Algorytm Diala ma wąskie zastosowanie – tylko do grafów o małych, całkowitych wagach.
 \end{enumerate}
 
+\section{Wnioski}
+
+\begin{itemize}
+    \item \textbf{Zgodność teorii z praktyką:} Wyniki eksperymentalne jednoznacznie potwierdziły teoretyczne ograniczenia algorytmu Diala. Testy na danych o dużej rozpiętości wag wykazały jego krytyczną niewydajność, wynikającą z konieczności obsługi olbrzymiej tablicy kubełków, co czyniło go najwolniejszym z badanych rozwiązań.
+    
+    \item \textbf{Stabilność algorytmu Dijkstry:} Dla rodzin grafów o nieznanej specyfice lub bardzo dużych wagach, klasyczny algorytm Dijkstry pozostaje najbezpieczniejszym wyborem. Jego czas działania jest przewidywalny i niezależny od rzędu wielkości kosztów krawędzi.
+    
+    \item \textbf{Przewaga Radix Heap:} W scenariuszach praktycznych, gdzie wagi są liczbami całkowitymi (nawet 64-bitowymi), algorytm Radix Heap okazuje się rozwiązaniem optymalnym. Łączy on zalety algorytmu Diala (szybkość) z odpornością na duże wagi, charakterystyczną dla Dijkstry.
+    
+    \item \textbf{Bilans zysków i strat:} Ewentualny narzut czasowy algorytmów Dijkstry i Radix Heap w przypadku małych wag jest znikomy. W przeciwieństwie do tego, koszt użycia algorytmu Diala przy dużych wagach jest olbrzymi. Dlatego w ogólnym rozrachunku algorytmy oparte na kopcach (binarnym lub radix) są rozwiązaniami znacznie bardziej wszechstronnymi.
+\end{itemize}
+
 \end{document}
-
-
-Krótko i na temat — złożoność Twojej implementacji **Diala**:
-
----
-
-### Złożoność czasowa (dokładnie)
-
-* Czas całkowity: **O(m + D)**, gdzie
-
-  * `m` — liczba krawędzi (relaksacje / wstawienia do kubełków),
-  * `D` — maksymalny rozważany dystans (liczba inkrementów `current_dist` podczas skanowania pustych kubełków).
-
-* Ponieważ w najgorszym przypadku żaden najkrótszy path nie przekracza ((n-1)\cdot C) (C = maksymalna waga krawędzi), mamy klasyczne oszacowanie:
-  [
-  D \le (n-1)\cdot C \quad\Rightarrow\quad \textbf{O(m + nC)}
-  ]
-  (to jest **złożoność pesymistyczna**).
-
-### Złożoność amortyzowana / praktyczna
-
-* Jeśli (C) jest małe/stałe (np. niewielkie całkowite wagi), to (D = O(n)) i wtedy Dial działa w praktyce **prawie liniowo**: **O(m + n)**.
-* Jeśli (C) jest duże (porównywalne z (m) czy (n)), to (nC) może być ogromne i Dial staje się niepraktyczny.
-
-### Złożoność pamięciowa
-
-* **O(n + C)** pamięci (wektory kubełków długości (C+1) + przechowywane wierzchołki).
-* Jeżeli używasz `vector<vector<int>>`, to koszt pamięci dodatkowo zależy od liczby i rozmiarów wewnętrznych wektorów, ale asymptotycznie to (O(n + C)).
-
-### Dlaczego tak?
-
-* Każda krawędź jest przetwarzana co najwyżej raz przy relaksacji ⇒ (O(m)) wstawień.
-* Przesuwanie kursora `current_dist++` (skanowanie pustych kubełków) wykonuje się łącznie co najwyżej D razy (inkrementy sumują się do maksymalnego dystansu przetwarzanego przez algorytm).
-* Operacje `push_back`/`pop_back` dla wektorów są amortyzowanie O(1).
-
-### Podsumowanie (wersje)
-
-* **Średnio / gdy C małe:** (O(m + n)) (praktycznie liniowo).
-* **Pesymistycznie:** (\mathbf{O(m + nC)}).
-* **Pamięć:** (\mathbf{O(n + C)}).
