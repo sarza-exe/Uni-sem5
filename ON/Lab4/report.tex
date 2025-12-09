@@ -1,0 +1,335 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue}
+
+\geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=25mm,
+ top=25mm,
+}
+
+\title{Sprawozdanie z Listy nr 4}
+\author{Sara Żyndul \\ 279686}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\setcounter{section}{-1}
+\section{Wstęp}
+
+\subsection{Opis problemu interpolacji}
+Problem interpolacji polega na skonstruowaniu wielomianu $P_n(x)$ stopnia co najwyżej $n$, który w zadanych węzłach $x_0, x_1, \dots, x_n$ przyjmuje wartości funkcji $f$, tzn.
+\[
+P_n(x_k) = f(x_k) \quad \text{dla } k=0, \dots, n.
+\]
+
+W praktyce często korzysta się z postaci Newtona wielomianu interpolacyjnego:
+\[
+N_n(x) = c_0 + c_1(x-x_0) + c_2(x-x_0)(x-x_1) + \dots + c_n \prod_{j=0}^{n-1}(x-x_j),
+\]
+gdzie współczynniki $c_k = f[x_0, \dots, x_k]$ są tzw. ilorazami różnicowymi. Postać Newtona jest wygodna z punktu widzenia obliczeń: ilorazy różnicowe wyliczamy rekurencyjnie (bez użycia macierzy 2-wymiarowej), a wartość wielomianu w dowolnym punkcie można efektywnie obliczyć algorytmem Hornera w czasie $O(n)$.
+
+Istotnym aspektem jest dobór węzłów interpolacji: węzły równoodległe są proste w zastosowaniu, lecz dla dużych $n$ mogą prowadzić do zjawiska Runge'go (duże oscylacje na końcach przedziału). Alternatywnie stosuje się węzły będące zerami wielomianu Czebyszewa, które zmniejszają błąd interpolacji.
+
+\subsection{Moduł i testy}
+Wszystkie funkcje zostały umieszczone w module module.jl. Dla każdej funkcji zostały wykonane testy, które potwierdziły poprawność implementacji.
+\begin{verbatim}
+Test Summary:        | Pass  Total  Time
+Testy Modułu         |   25     25  6.7s
+\end{verbatim}
+
+
+\section{Zadanie 1}
+
+\subsection{Idea algorytmu}
+Celem jest obliczenie ilorazów różnicowych
+\[
+f[x_0],\; f[x_0,x_1],\; f[x_0,x_1,x_2],\; \dots,\; f[x_0,\dots,x_n]
+\]
+dla zadanych węzłów $x_0,x_1,\dots,x_n$ i wartości funkcji $f(x_0),\dots,f(x_n)$.
+Definicja rekurencyjna ilorazów różnicowych brzmi:
+\[
+\begin{aligned}
+& f[x_k] = f(x_k),\\[4pt]
+& f[x_k,\dots,x_{k+m}] \;=\; \frac{f[x_{k+1},\dots,x_{k+m}] - f[x_k,\dots,x_{k+m-1}]}{x_{k+m}-x_k}.
+\end{aligned}
+\]
+
+Bezpośrednia implementacja tej definicji przy użyciu macierzy dwuwymiarowej jest prosta, ale zużywa pamięć rzędu $O(n^2)$. Algorytm \emph{in-place} wykorzystuje fakt, że do obliczenia ilorazów rzędu $m$ potrzebne są jedynie wartości ilorazów rzędu $m-1$. Zamiast przechowywać wszystkie rzędy w macierzy, nadpisujemy jeden wektor $fx$ — na początku jest to kopia wektora wartości funkcji (ilorazy rzędu $0$), a w kolejnych krokach jego elementy są zamieniane na ilorazy wyższych rzędów.
+
+Istotna sztuczka polega na iterowaniu indeksów od końca do początku w pętli wyznaczającej dany rząd różnic. Dzięki temu przy obliczeniu nowego $fx[i]$ nadal mamy dostęp do potrzebnych wartości $fx[i]$ i $fx[i-1]$ (obie rzędu $m-1$). W tej procedurze zajmujemy pamięć $O(n)$ i wykonujemy $O(n^2)$ operacji arytmetycznych.
+
+\bigskip
+Powyższy algorytm wymaga pamięci $O(n)$ i wykonuje $O(n^2)$ operacji — jest to standardowa, efektywna implementacja ilorazów różnicowych używana do konstrukcji współczynników w postaci Newtona.
+
+
+\section{Zadanie 2}
+
+\subsection{Idea algorytmu}
+Mamy wielomian interpolacyjny w postaci Newtona:
+\[
+N_n(x)=c_0 + c_1(x-x_0) + c_2(x-x_0)(x-x_1) + \dots + c_n\prod_{j=0}^{n-1}(x-x_j),
+\]
+gdzie $c_k = f[x_0,\dots,x_k]$ są ilorazami różnicowymi. Z zadania 8/L4 z ćwiczeń wiemy, że wartość $N_n(t)$ w punkcie $t$ można obliczyć rekurencyjnie za pomocą uogólnionego algorytmu Hornera:
+\[
+\begin{aligned}
+&w_n(t) := c_n,\\[4pt]
+&w_k(t) := c_k + (t - x_k)\, w_{k+1}(t),\qquad k = n-1,\dots,0,\\[4pt]
+&N_n(t)=w_0(t)
+\end{aligned}
+\]
+
+Algorytm wykorzystuje tę rekurencję i liczy wartości $w_k$ od $k=n$ w dół do $k=0$. Dla oszczędności pamięci trzymamy tylko jedną skalarną zmienną $w$ (wersja \emph{in-place}): najpierw ustawiamy $w=c_n$, a następnie dla kolejnych $k$ nadpisujemy $w \leftarrow c_k + (t-x_k)\,w$. Dzięki temu ewaluacja wymaga pamięci $O(1)$ i czasu $O(n)$.
+
+\bigskip
+
+\section{Zadanie 3}
+
+\subsection{Idea algorytmu}
+Mając współczynniki Newtona $c_0,\dots,c_n$ (wektor $fx$) oraz węzły $x_0,\dots,x_n$ chcemy otrzymać współczynniki w postaci naturalnej
+\[
+a_0 + a_1 x + a_2 x^2 + \dots + a_n x^n.
+\]
+Zadanie 9/L4 z ćwiczeń sugeruje użycie idei z zadania 8: zamiast ewaluować wielomian w punkcie, traktujemy $w_k(x)$ jako wielomian i budujemy go iteracyjnie. Zaczynamy od wielomianu stałego $p(x)=c_n$. W kroku dla danego $k$ mnożymy bieżący wielomian $p(x)$ przez $(x - x_k)$ i dodajemy $c_k$ do wyrazu wolnego:
+\[
+p_{\text{new}}(x) = c_k + (x - x_k)\,p(x).
+\]
+Jeżeli $p(x)=\sum_{i=0}^{m} a_i x^i$ to mnożenie przez $(x-x_k)$ daje nowe współczynniki:
+\[
+\begin{aligned}
+b_0 &= -x_k a_0,\\
+b_j &= a_{j-1} - x_k a_j \quad (j=1,\dots,m),\\
+b_{m+1} &= a_m,
+\end{aligned}
+\]
+a następnie $b_0 \mathrel{+}= c_k$.
+
+Powtarzając ten krok dla $k=n-1,n-2,\dots,0$ otrzymamy ostateczne współczynniki $a_0,\dots,a_n$. Można to zrobić \emph{in-place} w wektorze współczynników $a$, aktualizując go od końca (żeby nie nadpisać wartości, które jeszcze będą potrzebne). Złożoność algorytmu to $O(n^2)$ czasu i $O(n)$ pamięci.
+
+\bigskip
+
+\section{Zadanie 4}
+
+\subsection{Idea algorytmu}
+Celem zadania jest zinterpolowanie zadanej funkcji $f(x)$ na przedziale $[a,b]$ wielomianem Newtona stopnia $n$ oraz porównanie tego wielomianu z oryginalną funkcją na wykresie. Algorytm składa się z następujących etapów:
+
+\begin{enumerate}
+  \item \textbf{Walidacja danych wejściowych.}
+  \item \textbf{Wyznaczenie węzłów interpolacji.} W zależności od trybu wybieramy:
+    \begin{itemize}
+      \item węzły równoodległe: dla $k=0,\dots,n$,
+      \[
+        x_k = a + k\,h,\qquad h=\frac{b-a}{n},
+      \]
+      \item węzły Czebyszewa (zera $T_{n+1}$) w przedziale $[-1,1]$:
+      \[
+        t_k = \cos\!\Big(\frac{2k-1}{2(n+1)}\pi\Big),\quad k=1,\dots,n+1,
+      \]
+      a następnie skalujemy je do $[a,b]$ przez
+      \[
+        x_k = \frac{a+b}{2} + \frac{b-a}{2}\,t_k.
+      \]
+    \end{itemize}
+    Węzły Czebyszewa zmniejszają efekt Runge'a w przypadku dużych $n$.
+  \item \textbf{Obliczenie wartości funkcji w węzłach.} Dla każdego węzła $x_k$ obliczamy $f(x_k)$ i zapisujemy w wektorze wartości.
+  \item \textbf{Obliczenie ilorazów różnicowych.} Korzystamy z funkcji \texttt{ilorazyRoznicowe(x,f)}, która zwraca wektor współczynników Newtona $c_0,\dots,c_n$ (ilorazy różnicowe). Ten etap kosztuje $O(n^2)$ operacji.
+  \item \textbf{Ewaluacja wielomianu na gęstej siatce.} Tworzymy gęstą siatkę punktów $t_j$ na przedziale $[a,b]$ (np. $m=400$ punktów). Dla każdego punktu $t_j$ obliczamy wartość wielomianu Newtona za pomocą funkcji (\texttt{warNewton}), która działa w czasie $O(n)$ dla jednego punktu.
+  \item \textbf{Przygotowanie danych do rysowania.} Obliczamy wektor wartości oryginalnej funkcji $f(t_j)$ na tej samej siatce oraz wektor wartości wielomianu $p(t_j)$.
+  \item \textbf{Wizualizacja.} Rysujemy na jednym wykresie $f(t)$ i wielomian $N_n(t)$ na osi $[a,b]$, oraz zaznaczamy punkty węzłów $(x_k, f(x_k))$.
+\end{enumerate}
+
+\section{Zadanie 5}
+
+\subsection{Opis zadania}
+
+Celem zadania było przetestowanie funkcji \texttt{rysujNnfx} dla węzłów równoodległych na funkcjach klasy $C^\infty$ w niewielkich przedziałach. Eksperyment przeprowadzono dla wielomianów stopnia $n \in \{5, 10, 15\}$.
+
+\subsection{Podpunkt (a): Funkcja wykładnicza}
+Interpolowano funkcję $f(x) = e^x$ w przedziale $[0, 1]$.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/plot5a_n5.png}
+        \caption{$n=5$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/plot5a_n10.png}
+        \caption{$n=10$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/plot5a_n15.png}
+        \caption{$n=15$}
+    \end{subfigure}
+    \caption{Interpolacja funkcji $f(x)=e^x$ na węzłach równoodległych.}
+    \label{fig:zad5a}
+\end{figure}
+
+\subsection{Podpunkt (b): Funkcja trygonometryczno-wielomianowa}
+Interpolowano funkcję $f(x) = x^2 \sin(x)$ w przedziale $[-1, 1]$.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/plot5b_n5.png}
+        \caption{$n=5$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/plot5b_n10.png}
+        \caption{$n=10$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/plot5b_n15.png}
+        \caption{$n=15$}
+    \end{subfigure}
+    \caption{Interpolacja funkcji $f(x)=x^2 \sin(x)$ na węzłach równoodległych.}
+    \label{fig:zad5b}
+\end{figure}
+
+\subsection{Wnioski}
+Zarówno dla funkcji $e^x$, jak i $x^2 \sin(x)$, interpolacja wielomianowa z użyciem węzłów równoodległych daje bardzo dobre rezultaty. Już dla najniższego rzędu $n=5$ wielomian interpolacyjny idealnie pokrywa się z funkcją interpolowaną (krzywe na wykresach nakładają się). Wynika to z faktu, że badane funkcje są gładkie, a przedziały interpolacji stosunkowo wąskie, co sprzyja zbieżności wielomianu interpolacyjnego.
+
+\newpage
+\section{Zadanie 6}
+
+\subsection{Opis zadania}
+
+W tym zadaniu analizowano wpływ doboru węzłów (równoodległe vs. Czebyszewa) na jakość interpolacji dla funkcji trudniejszych w aproksymacji tj. $f(x) = |x|$ oraz $f(x) = \frac{1}{1+x^2}$.
+
+\subsection{Podpunkt (a): Funkcja $f(x) = |x|$}
+Badano funkcję $f(x) = |x|$ w przedziale $[-1, 1]$. Funkcja ta w punkcie $x=0$ jest "ostra" (zmienia gwałtownie kierunek).
+
+\begin{figure}[H]
+    \centering
+    \textbf{Węzły równoodległe}\par\medskip
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6aRowno_n5.png}
+        \caption{$n=5$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6aRowno_n10.png}
+        \caption{$n=10$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6aRowno_n15.png}
+        \caption{$n=15$}
+    \end{subfigure}
+    
+    \vspace{0.5cm}
+    \textbf{Węzły Czebyszewa}\par\medskip
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6aCzeby_n5.png}
+        \caption{$n=5$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6aCzeby_n10.png}
+        \caption{$n=10$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6aCzeby_n15.png}
+        \caption{$n=15$}
+    \end{subfigure}
+    \caption{Porównanie interpolacji funkcji $|x|$ dla węzłów równoodległych (góra) i Czebyszewa (dół).}
+\end{figure}
+
+\subsubsection{Analiza wyników}
+\begin{itemize}
+    \item \textbf{Węzły równoodległe:} Dla $n=5$ wierzchołek w $x=0$ jest zaokrąglony (wielomian nie jest w stanie oddać ostrego przegięcia). Wraz ze wzrostem stopnia wielomianu ($n=10, 15$) odwzorowanie w okolicy zera się poprawia, ale pojawiają się duże błędy interpolacji na krańcach przedziału.
+    \item \textbf{Węzły Czebyszewa:} Jakość interpolacji jest znacznie wyższa. Dla wyższych stopni ($n=10, 15$) węzły te pozwalają na lepsze odwzorowanie funkcji przy zerze, jednocześnie eliminując problem dużych błędów na krańcach przedziału.
+\end{itemize}
+
+\newpage
+\subsection{Podpunkt (b): Zjawisko Runge'go}
+Badano funkcję $f(x) = \frac{1}{1+x^2}$ w szerokim przedziale $[-5, 5]$.
+
+\begin{figure}[H]
+    \centering
+    \textbf{Węzły równoodległe}\par\medskip
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6bRowno_n5.png}
+        \caption{$n=5$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6bRowno_n10.png}
+        \caption{$n=10$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6bRowno_n15.png}
+        \caption{$n=15$}
+    \end{subfigure}
+    
+    \vspace{0.5cm}
+    \textbf{Węzły Czebyszewa}\par\medskip
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6bCzebys_n5.png}
+        \caption{$n=5$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6bCzebys_n10.png}
+        \caption{$n=10$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{plots/plot6bCzebys_n15.png}
+        \caption{$n=15$}
+    \end{subfigure}
+    \caption{Ilustracja zjawiska Runge'go dla funkcji $1/(1+x^2)$.}
+\end{figure}
+
+\subsubsection{Analiza wyników}
+Na funkcji $f(x) = \frac{1}{1+x^2}$ wyraźnie widać zjawisko Runge'go, co stanowi klasyczny przykład, dla którego interpolacja wielomianowa na węzłach równoodległych zawodzi.
+\begin{itemize}
+    \item \textbf{Węzły równoodległe:} Obserwujemy drastyczny wzrost błędu interpolacji na krańcach przedziału wraz ze wzrostem stopnia wielomianu $n$. Jest to tzw. \textbf{zjawisko Runge'go}. Gdy obszar interpolacji jest szeroki, węzły równoodległe powodują, że wielomian "nie nadąża" za funkcją przy brzegach, wpadając w mocne oscylacje. Dla żadnego $n$ nie uzyskano zadowalającego przybliżenia.
+    \item \textbf{Węzły Czebyszewa:} Zastosowanie węzłów, które są gęściej rozmieszczone na krańcach przedziału (zera wielomianu Czebyszewa), skutecznie eliminuje zjawisko Runge'go.
+    \begin{itemize}
+        \item Dla $n=5$ odwzorowanie jest słabe (zbyt mały stopień, by oddać kształt funkcji w zerze).
+        \item Dla $n=10$ uzyskujemy idealne odwzorowanie w punkcie $x=0$ (gdzie wypada węzeł) oraz dosyć stabilne zachowanie na brzegach.
+        \item Dla $n=15$ wielomian dosyć wiernie odtwarza kształt funkcji w całym przedziale.
+    \end{itemize}
+\end{itemize}
+
+\paragraph{O zjawisku Runge'a.} Runge zauważył, że interpolacja wielomianowa funkcji o dużych wariacjach (szczególnie z ostrymi końcami) przy użyciu równoodległych węzłów może prowadzić do narastających oscylacji na brzegach przedziału wraz ze wzrostem stopnia wielomianu. Przyczyną jest to, że wielomiany wyższego stopnia mają duże wartości współczynników odpowiadających wysokim potęgom $x^k$, co w połączeniu z równoodległymi węzłami powoduje wzmacnianie błędu brzegowego. W praktyce jedną z najskuteczniejszych metod przeciwdziałania zjawisku Runge'go jest użycie węzłów Czebyszewa — rozmieszczenie tych węzłów skupia je gęściej przy końcach przedziału i redukuje oscylacje na całym przedziale.
+
+\bigskip
+\subsection{Wnioski}
+\begin{itemize}
+  \item Dla problemów, w których funkcja ma ostrzejsze kształty lub szybkie zmiany na krańcach przedziału, stosowanie równoodległych węzłów może być bardzo niebezpieczne (efekt Runge'go). 
+  \item Węzły Czebyszewa znacząco poprawiają zachowanie interpolacji na końcach przedziału i tam, gdzie równoodległe węzły dają duże oscylacje. 
+  \item Jednakże dla bardzo „stromych” lokalnych struktur (np. w podpunkcie 6b dla $n=5$) może być konieczne zwiększenie $n$ lub lokalne zagęszczenie węzłów, by dobrze odtworzyć kształt funkcji.
+\end{itemize}
+
+\end{document}
