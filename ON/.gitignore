@@ -4,3 +4,4 @@ test.jl
 *.log
 *.out
 *.toc
+*.txt
