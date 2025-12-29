@@ -1,0 +1,9 @@
+labor4/
+mw2025/
+testy2025/
+*.o
+parser.hh
+stack.hh
+lexer.cc
+parser.cc
+!Makefile
