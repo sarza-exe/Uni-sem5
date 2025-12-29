@@ -3,6 +3,8 @@
 #include <string>
 #include <cstdio>
 
+#include "symbolTable.hh"
+
 using namespace std;
 
 extern void parse_code(vector<string>& program, FILE* data);
@@ -11,6 +13,15 @@ int main(int argc, char const* argv[]) {
     vector<string> program;
     FILE* input = nullptr;
     FILE* output = nullptr;
+
+    SymbolTable syms;
+    syms.declareArray("tab", 1, 3);
+    std::cout<<syms.getAddress("tab")<<" tab \n";
+    syms.declareVariable("b");
+    std::cout<<syms.getAddress("b")<<" b \n";
+    syms.declareArray("arrr", 2, 4);
+    syms.getArrayElementAddress("arrr", 1);
+
 
     if (argc != 3) {
         cerr << "Sposób użycia: kompilator plik_wejściowy plik_wyjściowy\n";

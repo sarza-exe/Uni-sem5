@@ -76,6 +76,6 @@
                           return PIDENTIFIER;
                         }
 
-.                       { fprintf(stderr, "Illegal char '%s' at line %d\n", yytext, yylineno); return ERROR; }
+.                       { fprintf(stderr, "Niepoprawny znak '%s'\n", yytext); return ERROR; }
 
 %%

@@ -1,6 +1,8 @@
 %code requires { 
-#include<vector> 
+#include <vector> 
 #include <string>
+#include <map>
+#include <stdexcept>
 
 using namespace std;
 }
@@ -10,15 +12,20 @@ using namespace std;
 #include <string>
 #include <vector>
 
+#include "codeGenerator.hh"
+#include "symbolTable.hh"
+
 // Deklaracje funkcji zewnętrznych (z Flexa i własnych)
 int yylex( void );
 void yyset_in( FILE * in_str );
 extern int yylineno;
 void yyerror(std::vector<std::string> & code, char const *s);
 
+CodeGenerator gen;
+
 %}
 
-/*%debug*/
+//%debug
 
 %parse-param { std::vector<std::string> & code }
 
@@ -57,7 +64,7 @@ void yyerror(std::vector<std::string> & code, char const *s);
 %%
 
 program_all:
-    procedures main
+    procedures main {gen.emit("HALT");}
     ;
 
 procedures:
@@ -67,7 +74,7 @@ procedures:
     ;
 
 proc_head:
-    PIDENTIFIER LPAREN args_decl RPAREN { code.push_back(std::string($1)); free($1); code.push_back("procedure"); };
+    PIDENTIFIER LPAREN args_decl RPAREN { gen.emit(std::string($1)); free($1); gen.emit("procedure", 5); };
 
 args_decl:
     args_decl COMMA type PIDENTIFIER
@@ -82,8 +89,8 @@ type:
     ;
 
 main:
-    PROGRAM IS declarations IN commands END { code.push_back("PROGRAM IS declarations IN commands END"); }
-    | PROGRAM IS IN commands END { code.push_back("PROGRAM IS IN commands END"); }
+    PROGRAM IS declarations IN commands END { gen.emit("PROGRAM IS declarations IN commands END"); }
+    | PROGRAM IS IN commands END { gen.emit("PROGRAM IS IN commands END", 6); }
     | ERROR         { yyerror( code, "Nierozpoznany symbol" ); }
     ;
 
@@ -155,15 +162,12 @@ identifier:
 /* Funkcja obsługi błędów */
 void yyerror(std::vector<std::string> & code, char const *s) {
     std::cerr << "Błąd składni w linii " << yylineno << ": " << s << std::endl;
-    for (const auto& line : code) {
-        cout << line.c_str() << "\n";
-    }
-    cout << "Yeah\n";
 }
 
 void parse_code( std::vector< std::string > & code, FILE * data ) 
 {
   cout << "Kompilowanie kodu." << endl;
+  gen.setCode(code);
   yyset_in( data );
   //extern int yydebug;
   //yydebug = 1;
