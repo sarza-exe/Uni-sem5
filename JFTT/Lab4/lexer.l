@@ -9,7 +9,7 @@
 %%
 [ \t\r]+                ;
 "#".*                   ;
-\n                      { ++yylineno; }
+\n                      ;
 
 ":="                    { return ASSIGN; }
 "!="                    { return NEQ; }
@@ -72,10 +72,13 @@
 
 
 [_a-z]+                 {        
-                          yylval.pid = strdup(yytext);
+                          Identifier *id = new Identifier;
+                          id->pid = strdup(yytext);
+                          id->num = yylineno;
+                          yylval.id = id;
                           return PIDENTIFIER;
                         }
 
-.                       { fprintf(stderr, "Niepoprawny znak '%s'\n", yytext); return ERROR; }
+.                       { fprintf(stderr, "Unrecognized character '%s'\n", yytext); return ERROR; }
 
 %%

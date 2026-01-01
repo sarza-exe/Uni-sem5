@@ -1,6 +1,7 @@
 labor4/
 mw2025/
 testy2025/
+tests/
 *.o
 parser.hh
 stack.hh

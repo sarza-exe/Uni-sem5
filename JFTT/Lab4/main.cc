@@ -14,13 +14,13 @@ int main(int argc, char const* argv[]) {
     FILE* input = nullptr;
     FILE* output = nullptr;
 
-    SymbolTable syms;
-    syms.declareArray("tab", 1, 3);
-    std::cout<<syms.getAddress("tab")<<" tab \n";
-    syms.declareVariable("b");
-    std::cout<<syms.getAddress("b")<<" b \n";
-    syms.declareArray("arrr", 2, 4);
-    syms.getArrayElementAddress("arrr", 1);
+    // SymbolTable syms;
+    // syms.declareArray("tab", 1, 3);
+    // std::cout<<syms.getAddress("tab")<<" tab \n";
+    // syms.declareVariable("b");
+    // std::cout<<syms.getAddress("b")<<" b \n";
+    // syms.declareArray("arrr", 2, 4);
+    // syms.getArrayElementAddress("arrr", 1);
 
 
     if (argc != 3) {
