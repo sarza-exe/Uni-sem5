@@ -12,10 +12,17 @@ struct Identifier {
 };
 
 struct VariableInfo {
+    std::string name;
     long long memory_address; // Adres w pamięci maszyny
     bool is_array_ref;        // Czy to referencja do tablicy przez zmienną?
     long long offset_or_addr; // Adres zmiennej indeksującej (dla arr[x])
     long long arr_start;
+    bool is_initialized;
+};
+
+struct ValueInfo {
+    bool is_address;
+    VariableInfo *varInfo;
 };
 }
 
@@ -80,6 +87,7 @@ void declare_variable(Identifier *id)
     long long num;       /* Dla liczb (64-bit)  */
     Identifier *id;
     VariableInfo *var_info;
+    ValueInfo *val;
     /* Tutaj w przyszłości dodasz wskaźniki na węzły AST */
 }
 
@@ -88,6 +96,7 @@ void declare_variable(Identifier *id)
 %token <id> PIDENTIFIER
 
 %type <var_info> identifier
+%type <val> value
 
 %token ERROR
 
@@ -155,7 +164,12 @@ commands:
     ;
 
 command:
-    identifier ASSIGN expression SEMICOLON 
+    identifier ASSIGN expression SEMICOLON {
+        // a := expr
+        // r_b zawiera adres a
+        // r_a zawiera wartość expression (policzone w expr)
+        codeGen.emit("RSTORE b");
+    } 
     | IF condition THEN commands ELSE commands ENDIF
     | IF condition THEN commands ENDIF 
     | WHILE condition DO commands ENDWHILE 
@@ -163,8 +177,7 @@ command:
     | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR 
     | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR 
     | proc_call SEMICOLON 
-    | READ identifier SEMICOLON
-    {
+    | READ identifier SEMICOLON {
         VariableInfo *info = $2;
         
         if (info->is_array_ref == false) { // x lub arr[5]
@@ -188,10 +201,13 @@ command:
             codeGen.emit("READ"); // Wczytaj liczbę do ra
             codeGen.emit("RSTORE b"); // Zapisz ra do adresu wskazanego przez rb
         }
-        
+        symbolTable.markInitialized(info->name);
+
         delete info;
     }
-    | WRITE value SEMICOLON                          /* Wypisywanie */
+    | WRITE value SEMICOLON {
+        codeGen.emit("WRITE");
+    }
     ;
 
 proc_call:
@@ -203,7 +219,7 @@ args:
     | PIDENTIFIER
     ;
 
-expression:
+expression: // zapisuje wartość wyrażenia do r_a
     value PLUS value
     | value MINUS value
     | value MULT value
@@ -221,18 +237,51 @@ condition:
     | value LE value
     ;
 
-value:
-    NUM
-    | identifier
+value: // zapisuje wartość wyrażenia do r_a
+    NUM {
+        $$ = new ValueInfo();
+        $$->is_address = false;
+        codeGen.generate_constant("a", $1);
+    }
+    | identifier{
+        VariableInfo *info = $1;
+        Symbol* sym = symbolTable.getSymbol(info->name);
+        if(!sym->is_initialized) yyerror("Cannot access uninitialized variable");
+        
+        if (info->is_array_ref == false) { // x lub arr[5]
+            codeGen.emit("LOAD", info->memory_address);
+        } else { // arr[x]
+            // Adres = AdresBazowy + Wartość(x) - StartIndex
+            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
+            long long net_offset = info->memory_address - info->arr_start;
+        
+            // rb zawiera net_offset
+            if (net_offset > 0) {
+                codeGen.generate_constant("b", net_offset); 
+                codeGen.emit("ADD b"); // ra = ra + rb = x + arr.memory_address - arr.start_index
+            } else if (net_offset < 0) {
+                codeGen.generate_constant("b", -net_offset);
+                codeGen.emit("SUB b"); // ra = max(ra - rb, 0) 
+            }
+            
+            codeGen.emit("SWP b"); // teraz rb zawiera adres
+            codeGen.emit("RLOAD b"); // Wczytaj liczbę do ra. ra = p_rb
+        }
+
+        $$ = new ValueInfo();
+        $$->is_address = true;
+        
+        delete info;
+    }
     ;
 
-identifier:
+identifier: // saves in VariableInfo if it's x, tab[2] or tab[x] with corresponding addresses and name
     PIDENTIFIER //x
     {
         $$ = new VariableInfo();
+        $$->name = $1->pid;
         $$->memory_address = symbolTable.getAddressVar($1->pid);
         $$->is_array_ref = false;
-        symbolTable.markInitialized($1->pid);
     }
     | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET //arr[x]
     {
@@ -246,11 +295,11 @@ identifier:
         if(var->is_initialized == 0) yyerror("Cannot access array with an uninitialized variable");
 
         $$ = new VariableInfo();
+        $$->name = $1->pid;
         $$->memory_address = arr->memory_address; // Adres bazowy tablicy
         $$->is_array_ref = true;
         $$->offset_or_addr = var->memory_address; // Adres zmiennej x
         $$->arr_start = arr->array_start;
-        symbolTable.markInitialized($1->pid);
     }
     | PIDENTIFIER LBRACKET NUM RBRACKET //arr[5]
     {
@@ -263,9 +312,9 @@ identifier:
         if ($3 < start || $3 > end) yyerror("Array index out of bounds");
         
         $$ = new VariableInfo();
+        $$->name = $1->pid;
         $$->memory_address = sym->memory_address + ($3 - start);
         $$->is_array_ref = false;
-        symbolTable.markInitialized($1->pid);
     }
     ;
 

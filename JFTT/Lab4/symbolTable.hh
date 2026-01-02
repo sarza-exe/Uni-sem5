@@ -12,8 +12,8 @@ struct Symbol {
     long long array_end;     // Koniec zakresu tablicy (np. 10)
     bool is_I = false;
     bool is_O = false;
-    bool is_T = false; 
-    bool is_initialized = false; // czy zmienna zawiera już w sobie jakoś wartość
+    bool is_T = false;
+    bool is_initialized = false; // tylko dla zmiennych
 };
 
 class SymbolTable {
@@ -46,7 +46,9 @@ public:
     }
 
     void markInitialized(std::string name){
-        getSymbol(name)->is_initialized = true;
+        Symbol* sym = getSymbol(name);
+        if(sym->is_array) return;
+        sym->is_initialized = true;
     }
 
     // Zwraca adres zmiennej lub rzuca błąd, jeśli nie istnieje
@@ -106,6 +108,7 @@ public:
         sym.is_array = true;
         sym.array_start = start;
         sym.array_end = end;
+        sym.is_initialized = true;
         const auto [variable, success] = scopes.back().insert({name, sym});
         if(!success) throw std::invalid_argument("Double declaration " + name);
         else std::cout<<"Inserted array "<<variable->first<<" \n";
