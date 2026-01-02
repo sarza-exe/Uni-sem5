@@ -14,15 +14,14 @@ struct Identifier {
 struct VariableInfo {
     std::string name;
     long long memory_address; // Adres w pamięci maszyny
-    bool is_array_ref;        // Czy to referencja do tablicy przez zmienną?
+    bool is_array_ref; // Czy to referencja do tablicy przez zmienną np. arr[x]
     long long offset_or_addr; // Adres zmiennej indeksującej (dla arr[x])
     long long arr_start;
-    bool is_initialized;
 };
 
 struct ValueInfo {
-    bool is_address;
-    VariableInfo *varInfo;
+    long long value = 0;
+    VariableInfo *var_info;
 };
 }
 
@@ -74,6 +73,40 @@ void declare_variable(Identifier *id)
         semantic_error(id->num, e.what());
     }
     free(id->pid);
+}
+
+//Zapisuje do reg wartość z val_info(5,a,tab[5],tab[a]). h JEST ZAREZEROWOWANY DO OBLICZEŃ. a jest używany do obliczeń
+//Jeśli mamy gdzieś > 1 value jednocześnie to tylko ostatnia może zostać zapisana do a.
+void save_value_to_reg(ValueInfo *val_info, std::string reg){
+    if(reg == "h") yyerror("r_h is reserved for calculations in save_value_to_reg!");
+    VariableInfo *info = val_info->var_info;
+    if(info == nullptr){
+        codeGen.generate_constant(reg, val_info->value);
+    }
+    else{
+        if (info->is_array_ref == false) { // x lub arr[5]
+            codeGen.emit("LOAD", info->memory_address);
+            if(reg != "a") codeGen.emit("SWP " + reg);
+        } else { // arr[x]
+            // Adres = AdresBazowy + Wartość(x) - StartIndex
+            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
+            long long net_offset = info->memory_address - info->arr_start;
+        
+            // rb zawiera net_offset
+            if (net_offset > 0) {
+                codeGen.generate_constant("h", net_offset); 
+                codeGen.emit("ADD h"); // ra = ra + rh = x + arr.memory_address - arr.start_index
+            } else if (net_offset < 0) {
+                codeGen.generate_constant("h", -net_offset);
+                codeGen.emit("SUB h"); // ra = max(ra - rh, 0) 
+            }
+            
+            codeGen.emit("SWP h"); // teraz rb zawiera adres
+            codeGen.emit("RLOAD h"); // Wczytaj liczbę do ra. ra = p_rh
+            if(reg != "a") codeGen.emit("SWP " + reg);
+    }}
+    delete info;
+    delete val_info;
 }
 
 
@@ -167,6 +200,28 @@ command:
     identifier ASSIGN expression SEMICOLON {
         // a := expr
         // r_b zawiera adres a
+        VariableInfo *info = $1;
+        if (info->is_array_ref == false) { // x lub arr[5]
+            codeGen.generate_constant("b", info->memory_address);
+        } else { // arr[x]
+            // Adres = AdresBazowy + Wartość(x) - StartIndex
+            codeGen.emit("SWP h"); // ra <-> rh (robimy bo ra zawiera wartość expression)
+            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
+            long long net_offset = info->memory_address - info->arr_start;
+        
+            if (net_offset > 0) { // rb zawiera net_offset
+                codeGen.generate_constant("b", net_offset); 
+                codeGen.emit("ADD b"); // ra = ra + rh = x + arr.memory_address - arr.start_index
+            } else if (net_offset < 0) {
+                codeGen.generate_constant("b", -net_offset);
+                codeGen.emit("SUB b"); // ra = max(ra - rh, 0) 
+            }
+            
+            codeGen.emit("SWP b"); // teraz rb zawiera adres
+            codeGen.emit("SWP h"); // ra <-> rh ra = value(expression)
+        }
+        symbolTable.markInitialized(info->name);
+        delete info;
         // r_a zawiera wartość expression (policzone w expr)
         codeGen.emit("RSTORE b");
     } 
@@ -202,10 +257,11 @@ command:
             codeGen.emit("RSTORE b"); // Zapisz ra do adresu wskazanego przez rb
         }
         symbolTable.markInitialized(info->name);
-
         delete info;
     }
+    // Zapisz do r_a wartość value i wywołaj WRITE
     | WRITE value SEMICOLON {
+        save_value_to_reg($2, "a");
         codeGen.emit("WRITE");
     }
     ;
@@ -220,14 +276,94 @@ args:
     ;
 
 expression: // zapisuje wartość wyrażenia do r_a
-    value PLUS value
-    | value MINUS value
-    | value MULT value
-    | value DIV value
-    | value MOD value
-    | value
+    value PLUS value {
+        save_value_to_reg($1, "b");
+        save_value_to_reg($3, "a");
+        codeGen.emit("ADD b");
+    }
+    | value MINUS value {
+        save_value_to_reg($1, "b");
+        save_value_to_reg($3, "a");
+        codeGen.emit("SWP b");
+        codeGen.emit("SUB b");
+    }
+    | value MULT value {
+        if ($3 -> value == 0 && $3->var_info == nullptr){
+            codeGen.emit("RST a");
+        }
+        else if ($1 -> value == 0 && $1->var_info == nullptr){
+            codeGen.emit("RST a");
+        }
+        else if ($3 -> value == 2){
+            save_value_to_reg($1, "a");
+            codeGen.emit("SHL a");
+        }
+        else if ($1 -> value == 2){
+            save_value_to_reg($3, "a");
+            codeGen.emit("SHL a");
+        }
+        else if ($3 -> value == 1){
+            save_value_to_reg($1, "a");
+        }
+        else if ($1 -> value == 1){
+            save_value_to_reg($3, "a");
+        }
+        else{
+            //r_a = r_b*r_c metodą rosyjskich chłopów
+            save_value_to_reg($1, "b");
+            save_value_to_reg($3, "c");
+            long long jump_label = codeGen.getCurrentLine();
+            codeGen.emit("RST a #MULT START"); //ra = 0
+            codeGen.emit("SWP d"); //ra <-> rd
+            codeGen.emit("RST a"); //ra = 0
+            codeGen.emit("ADD b"); //ra += b
+            codeGen.emit("SHR a"); //ra = ra/2
+            codeGen.emit("SHL a"); //ra = ra*2
+            codeGen.emit("SWP b"); //ra <-> rb
+            codeGen.emit("SUB b"); //ra = ra-rb
+            codeGen.emit("JZERO", jump_label+12); // jeśli rb%2==0 jump
+            codeGen.emit("SWP d");
+            codeGen.emit("ADD c");
+            codeGen.emit("SWP d");
+            codeGen.emit("SWP d");
+            codeGen.emit("SHL c");
+            codeGen.emit("SHR b");
+            codeGen.emit("SWP b");
+            codeGen.emit("JZERO", jump_label+19); // jeśli rb==0 end
+            codeGen.emit("SWP b");
+            codeGen.emit("JUMP", jump_label+1); // while(rb)
+            codeGen.emit("SWP b #MULT END");
+        }
+    }
+    | value DIV value {
+        if ($3 -> value == 0 && $3->var_info == nullptr){
+            codeGen.emit("RST a");
+        }
+        else if ($3 -> value == 2){
+            save_value_to_reg($1, "a");
+            codeGen.emit("SHR a");
+        }
+        else {
+            // co z dzieleniem przez 0 jeśli value to nie NUM
+            // SWP c    JZERO end_of_div    SWPc    a=b/c
+            // generate_division_code w jednym rejestrze wynik w drugim reszta z dzielenia(modulo)
+            save_value_to_reg($1, "b");
+            save_value_to_reg($3, "c");
+        }
+    }
+    | value MOD value {
+        if ($3 -> value == 0 && $3->var_info == nullptr){
+            codeGen.emit("RST a");
+        }
+        else{
+            save_value_to_reg($1, "b");
+            save_value_to_reg($3, "c");
+        }
+    }
+    | value { save_value_to_reg($1, "a");}
     ;
 
+//patrz komentarz do save_value_to_reg
 condition:
     value EQ value
     | value NEQ value
@@ -237,47 +373,25 @@ condition:
     | value LE value
     ;
 
-value: // zapisuje wartość wyrażenia do r_a
+value: // zapisuje do ValueInfo wartość NUM albo wskaźnik do VariableInfo
     NUM {
         $$ = new ValueInfo();
-        $$->is_address = false;
-        codeGen.generate_constant("a", $1);
+        $$->value = $1;
+        $$->var_info = nullptr;
     }
     | identifier{
         VariableInfo *info = $1;
         Symbol* sym = symbolTable.getSymbol(info->name);
         if(!sym->is_initialized) yyerror("Cannot access uninitialized variable");
-        
-        if (info->is_array_ref == false) { // x lub arr[5]
-            codeGen.emit("LOAD", info->memory_address);
-        } else { // arr[x]
-            // Adres = AdresBazowy + Wartość(x) - StartIndex
-            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
-            long long net_offset = info->memory_address - info->arr_start;
-        
-            // rb zawiera net_offset
-            if (net_offset > 0) {
-                codeGen.generate_constant("b", net_offset); 
-                codeGen.emit("ADD b"); // ra = ra + rb = x + arr.memory_address - arr.start_index
-            } else if (net_offset < 0) {
-                codeGen.generate_constant("b", -net_offset);
-                codeGen.emit("SUB b"); // ra = max(ra - rb, 0) 
-            }
-            
-            codeGen.emit("SWP b"); // teraz rb zawiera adres
-            codeGen.emit("RLOAD b"); // Wczytaj liczbę do ra. ra = p_rb
-        }
-
         $$ = new ValueInfo();
-        $$->is_address = true;
-        
-        delete info;
+        $$->var_info = info;
     }
     ;
 
 identifier: // saves in VariableInfo if it's x, tab[2] or tab[x] with corresponding addresses and name
     PIDENTIFIER //x
     {
+        if(symbolTable.getSymbol($1->pid) == nullptr) yyerror(("Variable \"" + std::string($1->pid) + "\" not declared").c_str());
         $$ = new VariableInfo();
         $$->name = $1->pid;
         $$->memory_address = symbolTable.getAddressVar($1->pid);
@@ -286,11 +400,11 @@ identifier: // saves in VariableInfo if it's x, tab[2] or tab[x] with correspond
     | PIDENTIFIER LBRACKET PIDENTIFIER RBRACKET //arr[x]
     {
         Symbol* arr = symbolTable.getSymbol($1->pid);
-        if(arr == nullptr) yyerror(("Array "+ std::string($1->pid) + " not declared").c_str());
+        if(arr == nullptr) yyerror(("Array \""+ std::string($1->pid) + "\" not declared").c_str());
         if(arr->is_array == 0) yyerror("Cannot access variable at index");
 
         Symbol* var = symbolTable.getSymbol($3->pid);
-        if(var == nullptr) yyerror(("Variable "+ std::string($3->pid) + " not declared").c_str());
+        if(var == nullptr) yyerror(("Variable \""+ std::string($3->pid) + "\" not declared").c_str());
         if(var->is_array == 1) yyerror("Cannot access array with another array");
         if(var->is_initialized == 0) yyerror("Cannot access array with an uninitialized variable");
 
