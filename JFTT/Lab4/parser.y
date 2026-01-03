@@ -81,7 +81,7 @@ void save_value_to_reg(ValueInfo *val_info, std::string reg){
     if(reg == "h") yyerror("r_h is reserved for calculations in save_value_to_reg!");
     VariableInfo *info = val_info->var_info;
     if(info == nullptr){
-        codeGen.generate_constant(reg, val_info->value);
+        codeGen.generateConstant(reg, val_info->value);
     }
     else{
         if (info->is_array_ref == false) { // x lub arr[5]
@@ -94,10 +94,10 @@ void save_value_to_reg(ValueInfo *val_info, std::string reg){
         
             // rb zawiera net_offset
             if (net_offset > 0) {
-                codeGen.generate_constant("h", net_offset); 
+                codeGen.generateConstant("h", net_offset); 
                 codeGen.emit("ADD h"); // ra = ra + rh = x + arr.memory_address - arr.start_index
             } else if (net_offset < 0) {
-                codeGen.generate_constant("h", -net_offset);
+                codeGen.generateConstant("h", -net_offset);
                 codeGen.emit("SUB h"); // ra = max(ra - rh, 0) 
             }
             
@@ -109,6 +109,8 @@ void save_value_to_reg(ValueInfo *val_info, std::string reg){
     delete val_info;
 }
 
+const std::string JPOS_lable = "JPOS";
+const std::string JZERO_lable = "JZERO";
 
 %}
 
@@ -121,6 +123,7 @@ void save_value_to_reg(ValueInfo *val_info, std::string reg){
     Identifier *id;
     VariableInfo *var_info;
     ValueInfo *val;
+    const std::string *lable;
     /* Tutaj w przyszłości dodasz wskaźniki na węzły AST */
 }
 
@@ -129,6 +132,7 @@ void save_value_to_reg(ValueInfo *val_info, std::string reg){
 %token <id> PIDENTIFIER
 
 %type <var_info> identifier
+%type <lable> condition
 %type <val> value
 
 %token ERROR
@@ -195,6 +199,32 @@ commands:
     commands command
     | command
     ;
+ 
+if_start: /* pomocniczy nieterminal, wstawia *$1 label i push_label(label) */
+    condition {
+      int L_else = codeGen.newLable();
+      codeGen.emitLable(L_else, *$1);
+      codeGen.pushLable(L_else);
+    };
+
+then_block: THEN commands;
+
+then_tail: /* to jest miejsce po wykonaniu then_block */ 
+    { 
+        int L_else = codeGen.popLable();
+        int L_end  = codeGen.newLable();
+        codeGen.emitLable(L_end, "JUMP"); // jump za ELSE
+        codeGen.defineLable(L_else);// definuj poczatek ELSE
+        codeGen.pushLable(L_end);
+    } ELSE commands ENDIF {
+        int L_end = codeGen.popLable();
+        codeGen.defineLable(L_end);
+    }
+  | ENDIF {//bez ELSE
+        int L_end = codeGen.popLable();
+        codeGen.defineLable(L_end);
+    }
+;
 
 command:
     identifier ASSIGN expression SEMICOLON {
@@ -202,7 +232,7 @@ command:
         // r_b zawiera adres a
         VariableInfo *info = $1;
         if (info->is_array_ref == false) { // x lub arr[5]
-            codeGen.generate_constant("b", info->memory_address);
+            codeGen.generateConstant("b", info->memory_address);
         } else { // arr[x]
             // Adres = AdresBazowy + Wartość(x) - StartIndex
             codeGen.emit("SWP h"); // ra <-> rh (robimy bo ra zawiera wartość expression)
@@ -210,10 +240,10 @@ command:
             long long net_offset = info->memory_address - info->arr_start;
         
             if (net_offset > 0) { // rb zawiera net_offset
-                codeGen.generate_constant("b", net_offset); 
+                codeGen.generateConstant("b", net_offset); 
                 codeGen.emit("ADD b"); // ra = ra + rh = x + arr.memory_address - arr.start_index
             } else if (net_offset < 0) {
-                codeGen.generate_constant("b", -net_offset);
+                codeGen.generateConstant("b", -net_offset);
                 codeGen.emit("SUB b"); // ra = max(ra - rh, 0) 
             }
             
@@ -225,8 +255,7 @@ command:
         // r_a zawiera wartość expression (policzone w expr)
         codeGen.emit("RSTORE b");
     } 
-    | IF condition THEN commands ELSE commands ENDIF
-    | IF condition THEN commands ENDIF 
+    | IF if_start then_block then_tail //działa
     | WHILE condition DO commands ENDWHILE 
     | REPEAT commands UNTIL condition SEMICOLON 
     | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR 
@@ -245,10 +274,10 @@ command:
         
             // Liczymy w rb wartość adresu
             if (net_offset > 0) {
-                codeGen.generate_constant("b", net_offset); 
+                codeGen.generateConstant("b", net_offset); 
                 codeGen.emit("ADD b"); // ra = ra + rb 
             } else if (net_offset < 0) {
-                codeGen.generate_constant("b", -net_offset);
+                codeGen.generateConstant("b", -net_offset);
                 codeGen.emit("SUB b"); // ra = max(ra - rb, 0) 
             }
             
@@ -288,12 +317,8 @@ expression: // zapisuje wartość wyrażenia do r_a
         codeGen.emit("SUB b");
     }
     | value MULT value {
-        if ($3 -> value == 0 && $3->var_info == nullptr){
-            codeGen.emit("RST a");
-        }
-        else if ($1 -> value == 0 && $1->var_info == nullptr){
-            codeGen.emit("RST a");
-        }
+        if ($3 -> value == 0 && $3->var_info == nullptr) codeGen.emit("RST a");
+        else if ($1 -> value == 0 && $1->var_info == nullptr) codeGen.emit("RST a");
         else if ($3 -> value == 2){
             save_value_to_reg($1, "a");
             codeGen.emit("SHL a");
@@ -302,37 +327,13 @@ expression: // zapisuje wartość wyrażenia do r_a
             save_value_to_reg($3, "a");
             codeGen.emit("SHL a");
         }
-        else if ($3 -> value == 1){
-            save_value_to_reg($1, "a");
-        }
-        else if ($1 -> value == 1){
-            save_value_to_reg($3, "a");
-        }
-        else{
-            //r_a = r_b*r_c metodą rosyjskich chłopów
+        else if ($3 -> value == 1) save_value_to_reg($1, "a");
+        else if ($1 -> value == 1) save_value_to_reg($3, "a");
+        else{ //r_a = r_b*r_c metodą rosyjskich chłopów
             save_value_to_reg($1, "b");
             save_value_to_reg($3, "c");
             long long jump_label = codeGen.getCurrentLine();
-            codeGen.emit("RST a #MULT START"); //ra = 0
-            codeGen.emit("SWP d"); //ra <-> rd
-            codeGen.emit("RST a"); //ra = 0
-            codeGen.emit("ADD b"); //ra += b
-            codeGen.emit("SHR a"); //ra = ra/2
-            codeGen.emit("SHL a"); //ra = ra*2
-            codeGen.emit("SWP b"); //ra <-> rb
-            codeGen.emit("SUB b"); //ra = ra-rb
-            codeGen.emit("JZERO", jump_label+12); // jeśli rb%2==0 jump
-            codeGen.emit("SWP d");
-            codeGen.emit("ADD c");
-            codeGen.emit("SWP d");
-            codeGen.emit("SWP d");
-            codeGen.emit("SHL c");
-            codeGen.emit("SHR b");
-            codeGen.emit("SWP b");
-            codeGen.emit("JZERO", jump_label+19); // jeśli rb==0 end
-            codeGen.emit("SWP b");
-            codeGen.emit("JUMP", jump_label+1); // while(rb)
-            codeGen.emit("SWP b #MULT END");
+            codeGen.generateMult(jump_label);
         }
     }
     | value DIV value {
@@ -363,14 +364,44 @@ expression: // zapisuje wartość wyrażenia do r_a
     | value { save_value_to_reg($1, "a");}
     ;
 
-//patrz komentarz do save_value_to_reg
+//skaczemy jeśli fałsz (sprawdzamy warunek przeciwny)
 condition:
-    value EQ value
-    | value NEQ value
-    | value GT value
-    | value LT value
-    | value GE value
-    | value LE value
+    value EQ value { // (a-b)+(b-a)>0
+        save_value_to_reg($1, "b");
+        save_value_to_reg($3, "c");
+        codeGen.generateIsEqual();
+        $$ = &JPOS_lable;
+    }
+    | value NEQ value { // (a-b)+(b-a)=0
+        save_value_to_reg($1, "b");
+        save_value_to_reg($3, "c");
+        codeGen.generateIsEqual();
+        $$ = &JZERO_lable;
+    }
+    | value GT value { // a <= b -> a-b <= 0
+        save_value_to_reg($3, "b");
+        save_value_to_reg($1, "a");
+        codeGen.emit("SUB b");
+        $$ = &JZERO_lable;
+    }
+    | value LT value { // b >= a -> 0 >= a-b
+        save_value_to_reg($1, "b");
+        save_value_to_reg($3, "a");
+        codeGen.emit("SUB b");
+        $$ = &JZERO_lable;
+    }
+    | value GE value { // b < a -> a-b > 0
+        save_value_to_reg($1, "b");
+        save_value_to_reg($3, "a");
+        codeGen.emit("SUB b");
+        $$ = &JPOS_lable;
+    }
+    | value LE value { // a > b -> a-b > 0
+        save_value_to_reg($3, "b");
+        save_value_to_reg($1, "a");
+        codeGen.emit("SUB b");
+        $$ = &JPOS_lable;
+    }
     ;
 
 value: // zapisuje do ValueInfo wartość NUM albo wskaźnik do VariableInfo
@@ -446,7 +477,8 @@ void parse_code( std::vector< std::string > & code, FILE * data )
   codeGen.setCode(code);
   yyset_in( data );
   //extern int yydebug;
-  //yydebug = 1;
+  //yydebug = 1; 
   yyparse();
+  codeGen.backpatchAllCheck();
   symbolTable.leaveScope();
 }

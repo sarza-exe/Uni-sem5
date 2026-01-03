@@ -18,6 +18,7 @@ struct Symbol {
 
 class SymbolTable {
     std::vector<std::map<std::string, Symbol>> scopes;
+    //std::map<std::string, std::map<std::string, Symbol>> scopes;
     long long memory_offset = 0;
     const long long MEMORY_END = LLONG_MAX/2;
 
