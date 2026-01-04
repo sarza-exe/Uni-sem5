@@ -43,7 +43,7 @@ struct ProcCall{
 %code provides {
 void declare_array(Identifier *id, long long start, long long end);
 void declare_variable(Identifier *id);
-void declare_argument(Identifier *id, char type);
+void declare_parameter(Identifier *id, char type);
 }
 
 
@@ -96,6 +96,7 @@ void set_arguments(const std::string& name, std::vector<const char*> args, long 
         if (!param.is_T && argIsArrayType) yyerror("Expected scalar variable as argument but got array");
         if (arg->is_O && param.is_I) yyerror("Cannot pass O argument to I parameter");
         if (arg->is_I && !param.is_I) yyerror("Cannot pass I argument to not I parameter");
+        std::cout<<argName<<" "<<arg->is_I<<" "<<"\n";
 
         if (param.is_T) {
             if (arg->is_param && arg->is_T) {
@@ -165,6 +166,93 @@ void declare_parameter(Identifier *id, char type)
 
 //Zapisuje do reg wartość z val_info(5,a,tab[5],tab[a]). h JEST ZAREZEROWOWANY DO OBLICZEŃ. a jest używany do obliczeń
 //Jeśli mamy gdzieś więcej niż jedną value jednocześnie to tylko ostatnia może zostać zapisana do a.
+//value_to_reg = true to value
+void save_to_reg(VariableInfo *info, std::string reg, bool value_to_reg){ 
+    if (info->is_array_ref == false) { // x lub arr[5] (stały indeks)
+        if (info->sym->is_param && info->sym->is_T) { // Tablica parametrowa(memory_address + 1 zawiera start_index)
+            // info->memory_address zawiera: sym->memory_address + index
+            long long constant_index = info->memory_address - info->sym->memory_address;
+            // Teraz realizujemy wzór: Adres = Base + (Index - Start)
+
+            codeGen.emit("LOAD", info->sym->memory_address + 1); //ra = startIndex
+            codeGen.emit("SWP h"); //rh = startIndex
+
+            codeGen.generateConstant("a", constant_index);
+            codeGen.emit("SUB h"); //ra = index - startIndex
+            codeGen.emit("SWP h");
+            codeGen.emit("LOAD", info->sym->memory_address); //ra = baseaddress
+            codeGen.emit("ADD h"); //ra = baseadress + (index - startIndex)
+
+            if(value_to_reg){
+                codeGen.emit("SWP h");
+                codeGen.emit("RLOAD h #param array const index");
+            }
+        }
+        else { //Zwykła zmienna lub lokalna tablica arr[5]
+            if(info->sym->is_param) // Jeśli to zwykły parametr (nie tablica), musimy wyłuskać wartość (dereferencja)
+            {
+                codeGen.emit("LOAD", info->memory_address);
+                if(value_to_reg){
+                    codeGen.emit("SWP h");
+                    codeGen.emit("RLOAD h #param");
+                }
+            }
+            else{
+                if(value_to_reg) codeGen.emit("LOAD", info->memory_address);
+                else codeGen.generateConstant("a", info->memory_address);
+            }
+        }
+        if(reg != "a") codeGen.emit("SWP " + reg);
+    } else { // arr[x]
+        // Adres = AdresBazowy + Wartość(x) - StartIndex
+        codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
+
+        if (info->ref->is_param) { // Jeśli indeks 'x' jest parametrem to ładujemy adres
+            if(info->ref->is_O && !info->ref->is_initialized) yyerror("Trying to access O variable");
+            codeGen.emit("SWP h");
+            codeGen.emit("RLOAD h #load x"); 
+        }
+        // Teraz w ra mamy liczbę całkowitą będącą indeksem tablicy
+        if (info->sym->is_param && info->sym->is_T) {
+            if(!info->sym->is_T) yyerror("Accessing parameter as array but array not marked as T");
+            // [memory_address] = Adres Bazowy, [memory_address + 1] = Start Index
+            // Odejmij StartIndex od wartości indeksu x (arr[x])
+            codeGen.emit("SWP h"); //rh = x
+            codeGen.emit("LOAD", info->memory_address + 1); //ra = start_index
+            codeGen.emit("SWP h"); //ra = x rh = start_index
+            codeGen.emit("SUB h"); //ra = x-start_index
+            
+            codeGen.emit("SWP h"); // Przenieś przesunięcie do 'h', żeby zwolnić 'a'
+            codeGen.emit("LOAD", info->memory_address); // Załaduj dynamiczny adres bazowy tablicy
+            codeGen.emit("ADD h"); // ra = memory_addres + x - start_index
+
+            if(value_to_reg){
+                codeGen.emit("SWP h");
+                codeGen.emit("RLOAD h #param");
+            }
+            if(reg != "a") codeGen.emit("SWP " + reg);
+        }
+        else{
+            long long net_offset = info->memory_address - info->sym->array_start;
+    
+            // rb zawiera net_offset
+            if (net_offset > 0) {
+                codeGen.generateConstant("h", net_offset); 
+                codeGen.emit("ADD h"); // ra = ra + rh = x + arr.memory_address - arr.start_index
+            } else if (net_offset < 0) {
+                codeGen.generateConstant("h", -net_offset);
+                codeGen.emit("SUB h"); // ra = max(ra - rh, 0) 
+            }
+            
+            if(value_to_reg){
+                codeGen.emit("SWP h"); // teraz rb zawiera adres
+                codeGen.emit("RLOAD h"); // Wczytaj liczbę do ra. ra = p_rh
+            }
+            if(reg != "a") codeGen.emit("SWP " + reg);
+        }
+    }
+}
+
 void save_value_to_reg(ValueInfo *val_info, std::string reg){
     if(reg == "h") yyerror("r_h is reserved for calculations in save_value_to_reg!");
     VariableInfo *info = val_info->var_info;
@@ -172,77 +260,15 @@ void save_value_to_reg(ValueInfo *val_info, std::string reg){
         codeGen.generateConstant(reg, val_info->value);
     }
     else{
-        if (info->is_array_ref == false) { // x lub arr[5] (stały indeks)
-            if (info->sym->is_param && info->sym->is_T) { // Tablica parametrowa(memory_address + 1 zawiera start_index)
-                // info->memory_address zawiera: sym->memory_address + index
-                long long constant_index = info->memory_address - info->sym->memory_address;
-                // Teraz realizujemy wzór: Adres = Base + (Index - Start)
-
-                codeGen.emit("LOAD", info->sym->memory_address + 1); //ra = startIndex
-                codeGen.emit("SWP h"); //rh = startIndex
-
-                codeGen.generateConstant("a", constant_index);
-                codeGen.emit("SUB h"); //ra = index - startIndex
-                codeGen.emit("SWP h");
-                codeGen.emit("LOAD", info->sym->memory_address); //ra = baseaddress
-                codeGen.emit("ADD h"); //ra = baseadress + (index - startIndex)
-
-                codeGen.emit("SWP h");
-                codeGen.emit("RLOAD h #param array const index");
-            }
-            else { //Zwykła zmienna lub lokalna tablica arr[5]
-                codeGen.emit("LOAD", info->memory_address);
-                if(info->sym->is_param) // Jeśli to zwykły parametr (nie tablica), musimy wyłuskać wartość (dereferencja)
-                {
-                    codeGen.emit("SWP h");
-                    codeGen.emit("RLOAD h #param");
-                }
-            }
-            if(reg != "a") codeGen.emit("SWP " + reg);
-        } else { // arr[x]
-            // Adres = AdresBazowy + Wartość(x) - StartIndex
-            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
-
-            if (info->ref->is_param) { // Jeśli indeks 'x' jest parametrem to ładujemy adres
-                if(info->ref->is_O && !info->ref->is_initialized) yyerror("Trying to access O variable");
-                codeGen.emit("SWP h");
-                codeGen.emit("RLOAD h #load x"); 
-            }
-            // Teraz w ra mamy liczbę całkowitą będącą indeksem tablicy
-            if (info->sym->is_param && info->sym->is_T) {
-                if(!info->sym->is_T) yyerror("Accessing parameter as array but array not marked as T");
-                // [memory_address] = Adres Bazowy, [memory_address + 1] = Start Index
-                // Odejmij StartIndex od wartości indeksu x (arr[x])
-                codeGen.emit("SWP h"); //rh = x
-                codeGen.emit("LOAD", info->memory_address + 1); //ra = start_index
-                codeGen.emit("SWP h"); //ra = x rh = start_index
-                codeGen.emit("SUB h"); //ra = x-start_index
-                
-                codeGen.emit("SWP h"); // Przenieś przesunięcie do 'h', żeby zwolnić 'a'
-                codeGen.emit("LOAD", info->memory_address); // Załaduj dynamiczny adres bazowy tablicy
-                codeGen.emit("ADD h"); // Dodaj przesunięcie
-                codeGen.emit("SWP h");
-                codeGen.emit("RLOAD h #param");
-            }
-            else{
-                long long net_offset = info->memory_address - info->sym->array_start;
-        
-                // rb zawiera net_offset
-                if (net_offset > 0) {
-                    codeGen.generateConstant("h", net_offset); 
-                    codeGen.emit("ADD h"); // ra = ra + rh = x + arr.memory_address - arr.start_index
-                } else if (net_offset < 0) {
-                    codeGen.generateConstant("h", -net_offset);
-                    codeGen.emit("SUB h"); // ra = max(ra - rh, 0) 
-                }
-                
-                codeGen.emit("SWP h"); // teraz rb zawiera adres
-                codeGen.emit("RLOAD h"); // Wczytaj liczbę do ra. ra = p_rh
-                if(reg != "a") codeGen.emit("SWP " + reg);
-            }
-    }}
+        save_to_reg(info, reg, true);
+    }
     delete info;
     delete val_info;
+}
+
+void save_address_to_reg(VariableInfo *info, std::string reg){
+    if(reg == "h") yyerror("r_h is reserved for calculations in save_address_to_reg!");
+    save_to_reg(info, reg, false);
 }
 
 const std::string JPOS_lable = "JPOS";
@@ -303,21 +329,21 @@ program_all:
 
 procedure_head: PROCEDURE PIDENTIFIER {
     if(symbolTable.procedureExists($2->pid)) yyerror("Procedure already declared");
-    symbolTable.createProcedure($2->pid, codeGen.getCurrentLine());
+    long long returnAddress = symbolTable.createProcedure($2->pid, codeGen.getCurrentLine());
     symbolTable.enterScope();
-    codeGen.emit("SWP g");
+    codeGen.emit("STORE", returnAddress);
 }
 
 procedures:
     procedures procedure_head proc_head IS declarations IN commands END {
-        symbolTable.leaveScope();
-        codeGen.emit("SWP g");
+        codeGen.emit("LOAD", symbolTable.getReturnAddress());
         codeGen.emit("RTRN");
+        symbolTable.leaveScope();
         }
     | procedures procedure_head proc_head IS IN commands END {
-        symbolTable.leaveScope();
-        codeGen.emit("SWP g");
+        codeGen.emit("LOAD", symbolTable.getReturnAddress());
         codeGen.emit("RTRN");
+        symbolTable.leaveScope();
         }
     | %empty
     ;
@@ -387,33 +413,17 @@ then_tail: /* to jest miejsce po wykonaniu then_block */
     };
 
 command:
-    identifier ASSIGN expression SEMICOLON {
-        // a := expr
-        // r_b zawiera adres a
+    identifier ASSIGN expression SEMICOLON { 
+        // v := expr, r_b zawiera adres v
         VariableInfo *info = $1;
-        if (info->is_array_ref == false) { // x lub arr[5]
-            codeGen.generateConstant("b", info->memory_address);
-        } else { // arr[x]
-            // Adres = AdresBazowy + Wartość(x) - StartIndex
-            codeGen.emit("SWP h"); // ra <-> rh (robimy bo ra zawiera wartość expression)
-            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x do ra
-            long long net_offset = info->memory_address - info->sym->array_start;
-        
-            if (net_offset > 0) { // rb zawiera net_offset
-                codeGen.generateConstant("b", net_offset); 
-                codeGen.emit("ADD b"); // ra = ra + rh = x + arr.memory_address - arr.start_index
-            } else if (net_offset < 0) {
-                codeGen.generateConstant("b", -net_offset);
-                codeGen.emit("SUB b"); // ra = max(ra - rh, 0) 
-            }
-            
-            codeGen.emit("SWP b"); // teraz rb zawiera adres
-            codeGen.emit("SWP h"); // ra <-> rh ra = value(expression)
-        }
+        if(info->sym->is_I) yyerror("Cannot modify constant I variable");
+
+        codeGen.emit("SWP f");
+        save_address_to_reg(info, "b");
+        codeGen.emit("SWP f"); 
+        codeGen.emit("RSTORE b"); // r_a zawiera wartość expression (policzone w expr)
         symbolTable.markInitialized(info->name);
         delete info;
-        // r_a zawiera wartość expression (policzone w expr)
-        codeGen.emit("RSTORE b");
     } 
     | IF if_start then_block then_tail //działa
     | WHILE{
@@ -438,7 +448,7 @@ command:
             int L_start = codeGen.popLable();
             codeGen.emitLable(L_start, *$5 );
         }
-    | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR 
+    | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR
     | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR 
     | proc_call SEMICOLON {
         if(!symbolTable.procedureExists($1->id->pid)) yyerror(("Calling undeclared procedure \"" + std::string($1->id->pid) + "\"").c_str());
@@ -451,24 +461,11 @@ command:
     | READ identifier SEMICOLON {
         VariableInfo *info = $2;
         
-        if (info->is_array_ref == false) { // x lub arr[5]
+        if (info->is_array_ref == false && info->sym->is_param == false) { // x lub arr[5]
             codeGen.emit("READ");
             codeGen.emit("STORE", info->memory_address);
         } else { // arr[x]
-            // Adres = AdresBazowy + Wartość(x) - StartIndex
-            codeGen.emit("LOAD", info->offset_or_addr); // Załaduj x
-            long long net_offset = info->memory_address - info->sym->array_start;
-        
-            // Liczymy w rb wartość adresu
-            if (net_offset > 0) {
-                codeGen.generateConstant("b", net_offset); 
-                codeGen.emit("ADD b"); // ra = ra + rb 
-            } else if (net_offset < 0) {
-                codeGen.generateConstant("b", -net_offset);
-                codeGen.emit("SUB b"); // ra = max(ra - rb, 0) 
-            }
-            
-            codeGen.emit("SWP b"); // teraz rb zawiera adres
+            save_address_to_reg(info, "b");
             codeGen.emit("READ"); // Wczytaj liczbę do ra
             codeGen.emit("RSTORE b"); // Zapisz ra do adresu wskazanego przez rb
         }
@@ -609,7 +606,7 @@ value: // zapisuje do ValueInfo wartość NUM albo wskaźnik do VariableInfo
         VariableInfo *info = $1;
         Symbol* sym = symbolTable.getSymbol(info->name);
         if(!sym->is_initialized && !sym->is_param) yyerror("Cannot access uninitialized variable");
-        if(sym->is_O) yyerror("Cannot access O variable");
+        if(sym->is_O && !sym->is_initialized) yyerror("Cannot access uninitialized O variable");
         $$ = new ValueInfo();
         $$->var_info = info;
     }
@@ -637,7 +634,7 @@ identifier: // saves in VariableInfo if it's x, tab[2] or tab[x] with correspond
         Symbol* var = symbolTable.getSymbol($3->pid);
         if(var == nullptr) yyerror(("Variable \""+ std::string($3->pid) + "\" not declared").c_str());
         if(var->is_array == 1) yyerror("Cannot access array with another array");
-        if(var->is_initialized == 0) yyerror("Cannot access array with an uninitialized variable");
+        if(var->is_initialized == 0 && !var->is_param) yyerror("Cannot access array with an uninitialized variable");
         if(var->is_O == 1) yyerror("Cannot access O variable");
 
         $$ = new VariableInfo();

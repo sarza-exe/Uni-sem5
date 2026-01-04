@@ -19,14 +19,15 @@ struct Symbol {
 
 struct Procedure {
     std::string name;
-    long long start_label; // Numer linii w VM, gdzie procedura się zaczyna
+    long long returnAddressVar;
+    long long startLable; // Numer linii w VM, gdzie procedura się zaczyna
     // Lista parametrów w kolejności deklaracji - potrzebne do walidacji wywołania!
     std::vector<Symbol> parameters; //SKOPIOWAĆ BO PRZY LEAVE SCOPE USUNA SIE
 }; 
 
 class SymbolTable {
     std::vector<std::map<std::string, Symbol>> scopes;
-    std::map<std::string, Procedure*> procedures;
+    std::map<std::string, Procedure> procedures;
     long long memory_offset = 0;
     const long long MEMORY_END = LLONG_MAX/2;
     std::string currProcedure = "";
@@ -52,21 +53,28 @@ public:
     }
 
     long long getProcedureLable(const std::string& procName){
+        std::cout << "trying to get label for proc "<<procedures[procName].name<<" label "<<procedures[procName].startLable<<"\n";
         if(!procedureExists(procName)) throw std::invalid_argument("Getting lable of unexisting procedure " + procName);
-        return procedures[procName]->start_label;
+        return procedures[procName].startLable;
     }
 
-    void createProcedure(const std::string& procName, long long start_label){
-        if (auto search = procedures.find(procName); search != procedures.end()){
+    long long getReturnAddress(){
+        return procedures[currProcedure].returnAddressVar;
+    }
+
+    long long createProcedure(const std::string& procName, long long startLable){
+        if (procedures.find(procName) != procedures.end()){
             throw std::invalid_argument("Procedure already declared");
         }
-        else{
-            Procedure proc;
-            proc.name = procName;
-            proc.start_label = start_label;
-            procedures[procName] = &proc;
-            currProcedure = procName;
-        }
+        Procedure proc;
+        proc.returnAddressVar = memory_offset;
+        memory_offset++;
+        proc.name = procName;
+        proc.startLable = startLable;
+        procedures.emplace(procName, std::move(proc)); // albo procedures[procName] = proc;
+        currProcedure = procName;
+        std::cout << procName << " has start label: " << startLable << "\n";
+        return proc.returnAddressVar;
     }
 
     Symbol* getSymbol(std::string name) {
@@ -115,7 +123,7 @@ public:
 
     std::vector<Symbol> getParameters(const std::string& name){
         if (auto search = procedures.find(name); search != procedures.end()){
-            return procedures[name]->parameters;
+            return procedures[name].parameters;
         }
         else{
             throw std::invalid_argument("Procedure not declared");
@@ -123,7 +131,7 @@ public:
     }
 
     void setArguments(const std::string& name, std::vector<const char*> args){
-        std::vector<Symbol> params = procedures[name]->parameters;
+        std::vector<Symbol> params = procedures[name].parameters;
         int argsSize = args.size();
         if((int)params.size() != argsSize) throw std::invalid_argument("Wrong number of arguments at call for procedure " + name);
 
@@ -155,15 +163,13 @@ public:
         }
 
         if (procedures.find(currProcedure) != procedures.end()) {
-            procedures[currProcedure]->parameters.push_back(s);
+            procedures[currProcedure].parameters.push_back(s);
         } else {
             throw std::runtime_error("Internal error: procedure not found");
         }
 
         scopes.back().emplace(name, std::move(s));
         ++memory_offset;
-
-        std::cout << "Inserted " << type << " " << name << " @" << (memory_offset-1) << "\n";
     }
 
     // Rejestruje nową zmienną w scopie
@@ -176,7 +182,6 @@ public:
         s.is_array = false;
         scopes.back().emplace(name, std::move(s));
         ++memory_offset;
-        std::cout << "Inserted " << name << " @" << (memory_offset-1) << "\n";
     }
 
     // Rejestruje tablicę w scopie
@@ -194,7 +199,6 @@ public:
         sym.is_initialized = true;
         const auto [variable, success] = scopes.back().insert({name, sym});
         if(!success) throw std::invalid_argument("Double declaration " + name);
-        else std::cout<<"Inserted array "<<variable->first<<" \n";
     }
     
     // Sprawdza czy zmienna istnieje w danym scopie
