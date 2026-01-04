@@ -134,6 +134,7 @@ const std::string JZERO_lable = "JZERO";
 %type <var_info> identifier
 %type <lable> condition
 %type <val> value
+%type <id> proc_call
 
 %token ERROR
 
@@ -161,14 +162,30 @@ program_all:
     procedures main {codeGen.emit("HALT");}
     ;
 
+procedure_head: PROCEDURE PIDENTIFIER {
+    if(symbolTable.procedureExists($2->pid)) yyerror("Procedure already declared");
+    symbolTable.createProcedure($2->pid, codeGen.getCurrentLine());
+    symbolTable.enterScope();
+    codeGen.emit("SWP g");
+}
+
 procedures:
-    procedures PROCEDURE proc_head IS declarations IN commands END
-    | procedures PROCEDURE proc_head IS IN commands END
+    procedures procedure_head proc_head IS declarations IN commands END {
+        symbolTable.leaveScope();
+        codeGen.emit("SWP g");
+        codeGen.emit("RTRN");
+        }
+    | procedures procedure_head proc_head IS IN commands END {
+        symbolTable.leaveScope();
+        codeGen.emit("SWP g");
+        codeGen.emit("RTRN");
+        }
     | %empty
     ;
 
 proc_head:
-    PIDENTIFIER LPAREN args_decl RPAREN;
+    LPAREN args_decl RPAREN {
+    };
 
 args_decl:
     args_decl COMMA type PIDENTIFIER
@@ -182,10 +199,16 @@ type:
     | %empty
     ;
 
+main_start: PROGRAM IS { 
+        symbolTable.enterScope(); //enter main scope
+        int L_end = codeGen.popLable();
+        codeGen.defineLable(L_end);
+    }
+
 main:
-    PROGRAM IS declarations IN commands END
-    | PROGRAM IS IN commands END
-    | ERROR         { yyerror(""); }
+    main_start declarations IN commands END
+    | main_start IN commands END
+    | ERROR { yyerror(""); }
     ;
 
 declarations:
@@ -200,7 +223,7 @@ commands:
     | command
     ;
  
-if_start: /* pomocniczy nieterminal, wstawia *$1 label i push_label(label) */
+if_start: /* pomocniczy nieterminal, wstawia *$1 label i pushLable(label) */
     condition {
       int L_else = codeGen.newLable();
       codeGen.emitLable(L_else, *$1);
@@ -223,8 +246,7 @@ then_tail: /* to jest miejsce po wykonaniu then_block */
   | ENDIF {//bez ELSE
         int L_end = codeGen.popLable();
         codeGen.defineLable(L_end);
-    }
-;
+    };
 
 command:
     identifier ASSIGN expression SEMICOLON {
@@ -256,11 +278,35 @@ command:
         codeGen.emit("RSTORE b");
     } 
     | IF if_start then_block then_tail //działa
-    | WHILE condition DO commands ENDWHILE 
-    | REPEAT commands UNTIL condition SEMICOLON 
+    | WHILE{
+            int L_start = codeGen.newLable();
+            codeGen.defineLable(L_start); // miejsce początku pętli
+            codeGen.pushLable(L_start); // zapamiętaj start (będzie potrzebny do JUMP)
+        } condition{
+            int L_end = codeGen.newLable();
+            codeGen.emitLable(L_end, *$3);
+            codeGen.pushLable(L_end);
+        } DO commands ENDWHILE {
+            int L_end = codeGen.popLable();
+            int L_start = codeGen.popLable();
+            codeGen.emitLable(L_start, "JUMP"); // skocz z powrotem na początek
+            codeGen.defineLable(L_end);
+        }
+    | REPEAT{
+            int L_start = codeGen.newLable();
+            codeGen.defineLable(L_start); // miejsce początku pętli
+            codeGen.pushLable(L_start);
+        } commands UNTIL condition SEMICOLON {
+            int L_start = codeGen.popLable();
+            codeGen.emitLable(L_start, *$5 );
+        }
     | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR 
     | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR 
-    | proc_call SEMICOLON 
+    | proc_call SEMICOLON {
+        if(!symbolTable.procedureExists($1->pid)) yyerror(("Calling undeclared procedure \"" + std::string($1->pid) + "\"").c_str());
+        long long procLable = symbolTable.getProcedureLable($1->pid);
+        codeGen.emit("CALL", procLable);
+    }
     | READ identifier SEMICOLON {
         VariableInfo *info = $2;
         
@@ -296,7 +342,9 @@ command:
     ;
 
 proc_call:
-    PIDENTIFIER LPAREN args RPAREN
+    PIDENTIFIER LPAREN args RPAREN {
+        $$ = $1;
+    }
     ;
 
 args:
@@ -332,8 +380,8 @@ expression: // zapisuje wartość wyrażenia do r_a
         else{ //r_a = r_b*r_c metodą rosyjskich chłopów
             save_value_to_reg($1, "b");
             save_value_to_reg($3, "c");
-            long long jump_label = codeGen.getCurrentLine();
-            codeGen.generateMult(jump_label);
+            long long jumpLable = codeGen.getCurrentLine();
+            codeGen.generateMult(jumpLable);
         }
     }
     | value DIV value {
@@ -473,12 +521,12 @@ void yyerror(char const *s) {
 
 void parse_code( std::vector< std::string > & code, FILE * data ) 
 {
-  cout << "Compiling..." << endl;
-  codeGen.setCode(code);
-  yyset_in( data );
-  //extern int yydebug;
-  //yydebug = 1; 
-  yyparse();
-  codeGen.backpatchAllCheck();
-  symbolTable.leaveScope();
+    cout << "Compiling..." << endl;
+    codeGen.setCode(code);
+    yyset_in( data );
+    //extern int yydebug;
+    //yydebug = 1; 
+    yyparse();
+    codeGen.backpatchAllCheck();
+    symbolTable.leaveScope();
 }

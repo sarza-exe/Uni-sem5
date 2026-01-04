@@ -7,26 +7,30 @@
 
 struct Symbol {
     long long memory_address; // Adres w pamięci maszyny wirtualnej
-    bool is_array;           // Czy to tablica?
-    long long array_start;   // Początek zakresu tablicy (np. -10)
-    long long array_end;     // Koniec zakresu tablicy (np. 10)
+    bool is_array; 
+    long long array_start; // Początek zakresu tablicy (np. -10)
+    long long array_end;
+    bool is_param = false; //jeśli true to ładujemy adres
     bool is_I = false;
     bool is_O = false;
     bool is_T = false;
     bool is_initialized = false; // tylko dla zmiennych
 };
 
+struct Procedure {
+    std::string name;
+    long long start_label; // Numer linii w VM, gdzie procedura się zaczyna
+    // Lista parametrów w kolejności deklaracji - potrzebne do walidacji wywołania!
+    std::vector<Symbol> parameters; //SKOPIOWAĆ BO PRZY LEAVE SCOPE USUNA SIE
+}; 
+
 class SymbolTable {
     std::vector<std::map<std::string, Symbol>> scopes;
-    //std::map<std::string, std::map<std::string, Symbol>> scopes;
+    std::map<std::string, Procedure*> procedures;
     long long memory_offset = 0;
     const long long MEMORY_END = LLONG_MAX/2;
 
 public:
-    SymbolTable(){
-        scopes.emplace_back(); // Scope globalny
-    }
-
     void enterScope(){
         scopes.emplace_back(); // Nowy scope lokalny
     }
@@ -35,15 +39,34 @@ public:
         scopes.pop_back(); // Wychodzimy ze scopu lokalnego
     }
 
+    bool procedureExists(const std::string& procName){
+        if (auto search = procedures.find(procName); search != procedures.end())
+            return true;
+        else return false;
+    }
+
+    long long getProcedureLable(const std::string& procName){
+        if(!procedureExists(procName)) throw std::invalid_argument("Getting lable of unexisting procedure " + procName);
+        return procedures[procName]->start_label;
+    }
+
+    void createProcedure(const std::string& procName, long long start_label){
+        if (auto search = procedures.find(procName); search != procedures.end()){
+            throw std::invalid_argument("Procedure already declared");
+        }
+        else{
+            Procedure proc;
+            proc.name = procName;
+            proc.start_label = start_label;
+            procedures[procName] = &proc;
+        }
+    }
+
     Symbol* getSymbol(std::string name) {
         // Szuka od ostatniego zakresu (lokalny) do pierwszego (globalny)
-        for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-            auto search = it->find(name);
-            if (search != it->end()) {
-                return &search->second;
-            }
-        }
-        return nullptr;
+        if (auto search = scopes.back().find(name); search != scopes.back().end())
+            return &search->second;
+        else return nullptr;
     }
 
     void markInitialized(std::string name){
@@ -113,13 +136,6 @@ public:
         const auto [variable, success] = scopes.back().insert({name, sym});
         if(!success) throw std::invalid_argument("Double declaration " + name);
         else std::cout<<"Inserted array "<<variable->first<<" \n";
-    }
-
-    // TODO
-    // Pomocnicza funkcja do argumentów procedur
-    // Argumenty muszą trafić do zakresu procedury, ale mogą być referencjami
-    void declareArgument(std::string name) {
-         // Tutaj logika podobna do declareVariable, ale w VM argumenty też zajmują komórki pamięci
     }
     
     // Sprawdza czy zmienna istnieje w danym scopie

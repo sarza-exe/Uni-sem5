@@ -26,18 +26,18 @@ public:
         pending_fixups.clear();
     }
 
-    void setCode(std::vector<std::string> & codeRef)
-    {
+    void setCode(std::vector<std::string> & codeRef) {
         code = &codeRef;
+        int L_end  = newLable();
+        pushLable(L_end);
+        emitLable(L_end, "JUMP");
     }
     
-    void emit(std::string instruction)
-    {
+    void emit(std::string instruction) {
         code->push_back(instruction);
     }
     
-    void emit(std::string instruction, long long arg)
-    {
+    void emit(std::string instruction, long long arg){
         code->push_back(instruction + " " + std::to_string(arg));
     }
 
@@ -46,24 +46,40 @@ public:
         return next_lable_id++;
     }
 
-    void pushLable(int L) { lable_stack.push_back(L); }
+    void pushLable(int L) { 
+        lable_stack.push_back(L); 
+    }
 
     int popLable() { 
-        int v = lable_stack.back(); 
-        lable_stack.pop_back(); 
-        return v; 
+        if (lable_stack.empty()) {
+            std::cerr << "Internal error: popLable on empty stack\n";
+            throw std::runtime_error("popLable on empty stack");
+        }
+        int v = lable_stack.back();
+        lable_stack.pop_back();
+        return v;
     }
 
     // Emituj j_lable i dopisz do pending_fixups
     void emitLable(int lable, std::string j_lable) {
-        int idx = (int)code->size();
-        code->push_back(j_lable);  // placeholder
-        pending_fixups.push_back({idx, lable, j_lable});
+        auto it = lable_address.find(lable);
+        if (it != lable_address.end()) { // lable already known -> emit direct
+            code->push_back(j_lable + " " + std::to_string(it->second));
+        } else {
+            int idx = (int)code->size();
+            code->push_back(j_lable);  // placeholder
+            pending_fixups.push_back({idx, lable, j_lable});
+        }
     }
 
     // Zdefiniuj etykietę (oznacz miejsce aktualnym indeksem kodu) i backpatchuj
     void defineLable(int lable) {
+        std::cout<<"Defining lable "<<lable<<"\n";
         int addr = (int)code->size();
+        if (lable_address.find(lable) != lable_address.end()) {
+            std::cerr << "Label " << lable << " already defined\n";
+            return;
+        }
         lable_address[lable] = addr;
 
         // backpatchuj wszystkie pending_fixups, które celują w ten lable
