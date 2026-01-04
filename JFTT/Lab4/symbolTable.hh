@@ -7,7 +7,7 @@
 
 struct Symbol {
     long long memory_address; // Adres w pamięci maszyny wirtualnej
-    bool is_array; 
+    bool is_array = false; 
     long long array_start; // Początek zakresu tablicy (np. -10)
     long long array_end;
     bool is_param = false; //jeśli true to ładujemy adres
@@ -29,6 +29,7 @@ class SymbolTable {
     std::map<std::string, Procedure*> procedures;
     long long memory_offset = 0;
     const long long MEMORY_END = LLONG_MAX/2;
+    std::string currProcedure = "";
 
 public:
     void enterScope(){
@@ -37,12 +38,17 @@ public:
 
     void leaveScope(){
         scopes.pop_back(); // Wychodzimy ze scopu lokalnego
+        currProcedure = "";
     }
 
     bool procedureExists(const std::string& procName){
         if (auto search = procedures.find(procName); search != procedures.end())
             return true;
         else return false;
+    }
+
+    std::string currentProcedure(){
+        return currProcedure;
     }
 
     long long getProcedureLable(const std::string& procName){
@@ -59,11 +65,11 @@ public:
             proc.name = procName;
             proc.start_label = start_label;
             procedures[procName] = &proc;
+            currProcedure = procName;
         }
     }
 
     Symbol* getSymbol(std::string name) {
-        // Szuka od ostatniego zakresu (lokalny) do pierwszego (globalny)
         if (auto search = scopes.back().find(name); search != scopes.back().end())
             return &search->second;
         else return nullptr;
@@ -101,10 +107,63 @@ public:
             throw std::invalid_argument("Array \"" + name + "\" not defined");
         const Symbol& s = it->second;
         if (!s.is_array)
-            throw std::invalid_argument("Trying to access \"" + name + "\" through index but \"" + name + "\" is not an array8");
+            throw std::invalid_argument("Trying to access \"" + name + "\" through index but \"" + name + "\" is not an array");
         if (index < s.array_start || index > s.array_end)
             throw std::out_of_range("Index " + std::to_string(index) + " not in range for array \"" + name + "\"");
         return s.memory_address + (index - s.array_start);
+    }
+
+    std::vector<Symbol> getParameters(const std::string& name){
+        if (auto search = procedures.find(name); search != procedures.end()){
+            return procedures[name]->parameters;
+        }
+        else{
+            throw std::invalid_argument("Procedure not declared");
+        }
+    }
+
+    void setArguments(const std::string& name, std::vector<const char*> args){
+        std::vector<Symbol> params = procedures[name]->parameters;
+        int argsSize = args.size();
+        if((int)params.size() != argsSize) throw std::invalid_argument("Wrong number of arguments at call for procedure " + name);
+
+        for (int i = 0; i < argsSize; i++){
+            std::string argName = args[i];
+            Symbol* arg = getSymbol(argName);
+            if(arg == nullptr) throw std::invalid_argument("Trying to call procedure " + name + "with undeclared variable " + name);
+            Symbol param = params.at(i);
+
+            std::cout<<"argument " << arg << " at " << param.memory_address<<"\n";
+        }
+    }
+
+    void declareParameter(const std::string& name, char type)
+    {
+        if (exists(name)) throw std::invalid_argument("Double variable declaration: " + name);
+        if (memory_offset + 1 > MEMORY_END) throw std::overflow_error("Run out of memory for variable: " + name);
+        
+        Symbol s;
+        s.memory_address = memory_offset;
+        s.is_param = true;
+        s.is_array = (type == 'T');
+
+        if(type == 'I') s.is_I = true;
+        else if(type == 'O') s.is_O = true;
+        else if(type == 'T'){
+             s.is_T = true;
+             memory_offset++; //adres dla indeksu startowego
+        }
+
+        if (procedures.find(currProcedure) != procedures.end()) {
+            procedures[currProcedure]->parameters.push_back(s);
+        } else {
+            throw std::runtime_error("Internal error: procedure not found");
+        }
+
+        scopes.back().emplace(name, std::move(s));
+        ++memory_offset;
+
+        std::cout << "Inserted " << type << " " << name << " @" << (memory_offset-1) << "\n";
     }
 
     // Rejestruje nową zmienną w scopie
