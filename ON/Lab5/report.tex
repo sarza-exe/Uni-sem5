@@ -1,0 +1,228 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\geometry{margin=2.5cm}
+
+\title{\textbf{Sprawozdanie z Listy nr 5}\\
+\large Rozwiązywanie układów równań liniowych o strukturze blokowej}
+\author{Sara Żyndul\\279686} 
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Przedstawienie problemu}
+Zadanie polega na rozwiązaniu układu równań liniowych postaci $Ax = b$, gdzie $A \in \mathbb{R}^{n \times n}$ jest macierzą rzadką o specyficznej strukturze blokowej. Macierz $A$ zdefiniowana jest następująco:
+\begin{equation}
+    A = \begin{pmatrix}
+    A_1 & C_1 & 0 & \dots & 0 \\
+    B_2 & A_2 & C_2 & \dots & 0 \\
+    \vdots & \ddots & \ddots & \ddots & \vdots \\
+    0 & \dots & B_{v-1} & A_{v-1} & C_{v-1} \\
+    0 & \dots & 0 & B_v & A_v
+    \end{pmatrix}
+\end{equation}
+gdzie $n$ jest podzielne przez rozmiar bloku $l$, a $v = n/l$ oznacza liczbę bloków wzdłuż głównej diagonali. Poszczególne bloki mają następującą charakterystykę:
+\begin{itemize}
+    \item $A_k \in \mathbb{R}^{l \times l}$ – macierze gęstej.
+    \item $B_k \in \mathbb{R}^{l \times l}$ – macierze rzadkie, posiadające elementy niezerowe jedynie w pierwszym wierszu i ostatniej kolumnie,
+    \item $C_k \in \mathbb{R}^{l \times l}$ – macierze diagonalne.
+\end{itemize}
+Celem jest implementacja efektywnych algorytmów numerycznych uwzględniających rzadkość macierzy, tak aby zredukować złożoność obliczeniową ze standardowego $O(n^3)$ do $O(n)$.
+
+\section{Struktura pamiętająca macierz}
+Dla dużych wartości $n$ (rzędu $10^6$) przechowywanie macierzy w postaci pełnej tablicy dwuwymiarowej jest nieefektywne i niemożliwe ze względu na ograniczenia pamięciowe komputera.
+Zaprojektowano strukturę \texttt{BlockMatrix}, która przechowuje wyłącznie niezerowe bloki macierzy. Struktura ta zawiera:
+\begin{itemize}
+    \item Tablicę trójwymiarową dla bloków $A_k$ o rozmiarze $l \times l \times v$.
+    \item Tablicę trójwymiarową dla bloków $B_k$ o rozmiarze $l \times l \times v$.
+    \item Tablicę trójwymiarową dla bloków $C_k$ o rozmiarze $l \times l \times v$.
+\end{itemize}
+Całkowita złożoność pamięciowa wynosi:
+$$ M(n) \approx v \cdot l^2 + v \cdot l^2 + v \cdot l^2 = 3 \cdot \frac{n}{l} \cdot l^2 = 3nl $$
+Złożoność pamięciowa wynosi zatem $O(n)$, co jest optymalną wartością dla macierzy rzadkich tego typu.
+
+\section{Metoda eliminacji Gaussa}
+
+\subsection{Algorytm bazowy dla macierzy gęstych}
+Klasyczna metoda eliminacji Gaussa dla macierzy gęstej $A \in \mathbb{R}^{n \times n}$ polega na sprowadzeniu jej do postaci górnotrójkątnej $U$ przy pomocy operacji elementarnych na wierszach. W $k$-tym kroku algorytmu (dla $k=1,\dots,n-1$) zerowane są elementy pod główną przekątną w $k$-tej kolumnie.
+Współczynnik zerujący (mnożnik) definiuje się jako $m_{ik} = \frac{a_{ik}^{(k)}}{a_{kk}^{(k)}}$, a następnie aktualizuje się wiersze: $w_i \leftarrow w_i - m_{ik} \cdot w_k$ dla $i > k$.
+Standardowa złożoność tego procesu wynosi $O(n^3)$.
+
+\subsection{Adaptacja do struktury blokowej}
+W przypadku omawianej macierzy blokowej, eliminacja Gaussa została zmodyfikowana, aby wykorzystać fakt występowania licznych bloków zerowych. Proces przebiega następująco:
+\begin{enumerate}
+    \item Iterujemy po blokach diagonalnych $k$ od 1 do $v-1$.
+    \item Wewnątrz bloku $A_k$ wykonujemy lokalną eliminację Gaussa, sprowadzając go do postaci górnotrójkątnej. Operacje na wierszach wewnątrz $A_k$ są powielane na odpowiadających im wierszach bloku $C_k$ oraz wektora $b$.
+    \item Następnie zerujemy blok $B_{k+1}$ (znajdujący się pod $A_k$), wykorzystując wiersze z przetworzonego bloku $A_k$. Ponieważ $B_{k+1}$ znajduje się w tym samym wierszu blokowym co $A_{k+1}$, a $A_k$ w tym samym co $C_k$, operacja $Wiersz(B_{k+1}) - m \cdot Wiersz(A_k)$ powoduje modyfikację bloku $A_{k+1}$ o wartości wynikające z $C_k$. Struktura bloków zerowych gwarantuje, że zmniejszenie rzadkości bloków nie propaguje się dalej niż do sąsiedniego bloku.
+\end{enumerate}
+
+\subsubsection{Warianty wyboru elementu głównego}
+\begin{itemize}
+    \item \textbf{Bez wyboru (GNP):} Pivotem jest zawsze element diagonalny $a_{ii}$.
+    \item \textbf{Z częściowym wyborem (GPP):} W celu zmiejszenia błędu względnego, przed eliminacją $i$-tej kolumny w bloku $A_k$, wyszukiwany jest element o największym module w tej kolumnie (w zakresie wierszy należących do bieżącego bloku). Następuje zamiana wierszy w $A_k$, $C_k$, $B_k$ (jeśli istnieje) oraz w wektorze $b$.
+\end{itemize}
+
+\subsection{Analiza złożoności czasowej}
+Niech $l$ będzie stałym rozmiarem bloku.
+\begin{itemize}
+    \item Liczba kroków głównych pętli (liczba bloków) wynosi $v = n/l$.
+    \item W każdym kroku wykonujemy operacje na macierzach rozmiaru $l \times l$. Koszt operacji wewnątrz bloku (mnożenia, dodawania, zamiany wierszy) zależy tylko od $l$ i w pesymistycznym przypadku wynosi $O(l^3)$.
+    \item Całkowity czas $T(n)$ można oszacować jako:
+    $$ T(n) \approx \frac{n}{l} \cdot l^3 = n \cdot l^2$$
+\end{itemize}
+Dla ustalonego, małego $l$ (w zadaniu $l \ge 2$), czynnik $l^2$ jest stałą. Zatem całkowita złożoność czasowa wynosi \textbf{$O(n)$}.
+
+\section{Rozkład LU}
+
+\subsection{Teoria i związek z eliminacją Gaussa}
+Rozkład LU jest metodą faktoryzacji macierzy $A$ na iloczyn macierzy dolnotrójkątnej $L$ (z jedynkami na przekątnej) i górnotrójkątnej $U$, tj. $A=LU$. Proces ten jest ściśle związany z eliminacją Gaussa.
+Przejście od macierzy $A^{(k)}$ do $A^{(k+1)}$ (kolejny krok eliminacji) można zapisać jako mnożenie przez macierz elementarną $L^{(k)}$:
+$$ A^{(k+1)} = L^{(k)}A^{(k)} $$
+Proces sprowadzania macierzy $A^{(1)}$ do macierzy górnotrójkątnej $A^{(n)}$ (którą oznaczamy jako $U$) w $n-1$ krokach można zapisać:
+$$ U = L^{(n-1)} \dots L^{(2)}L^{(1)} A $$
+Stąd otrzymujemy:
+$$ A = (L^{(n-1)} \dots L^{(2)}L^{(1)})^{-1} U $$
+$$ A = L^{(1)-1} L^{(2)-1} \dots L^{(n-1)-1} U $$
+Przyjmując $L = L^{(1)-1} \dots L^{(n-1)-1}$, otrzymujemy $A = LU$. W praktyce macierz $L$ zawiera mnożniki używane podczas eliminacji Gaussa.
+
+\subsection{Adaptacja do struktury blokowej}
+Zaimplementowano algorytm rozkładu LU działający "w miejscu" (in-place). Elementy macierzy $L$ i $U$ są przechowywane w strukturze `BlockMatrix` w następujący sposób:
+\begin{itemize}
+    \item Macierz $U$: elementy na i nad główną przekątną bloków $A_k$ oraz całe bloki $C_k$.
+    \item Macierz $L$: elementy pod główną przekątną bloków $A_k$ oraz całe bloki $B_k$ (z domyślnymi jedynkami na głównej diagonali całego układu).
+\end{itemize}
+Podczas eliminacji bloku $B_{k+1}$ przy użyciu $A_k$, wyliczone mnożniki są zapisywane w miejscu zerowanego bloku $B_{k+1}$ (stając się fragmentem macierzy $L$). Należy przy tym pamiętać o aktualizacji pozostałej części bloku $B_{k+1}$ oraz modyfikacji $A_{k+1}$ o wpływ $C_k$.
+
+Dla wariantu z częściowym wyborem elementu głównego (LUPP), algorytm wyznacza rozkład $PA = LU$, gdzie $P$ jest macierzą permutacji. Implementacja zwraca w tym przypadku wektor permutacji $p$.
+
+\subsection{Rozwiązywanie układu przy pomocy LU}
+Po wyznaczeniu rozkładu, rozwiązanie układu $Ax=b$ (lub $PAx=Pb$) sprowadza się do rozwiązania dwóch układów trójkątnych:
+\begin{enumerate}
+    \item $Ly = b$ (dla LUPP: $Ly = b[p]$) – podstawienie w przód. Wykorzystuje bloki $B_k$ i dolne części $A_k$.
+    \item $Ux = y$ – podstawienie wstecz. Wykorzystuje górne części $A_k$ i bloki $C_k$.
+\end{enumerate}
+
+\subsection{Analiza złożoności czasowej}
+\begin{itemize}
+    \item \textbf{Faktoryzacja:} Przechodzi przez wszystkie $n/l$ bloków raz. Złożoność $O(n)$.
+    \item \textbf{Solver:} Wykonuje dwa przejścia przez bloki (w przód i w tył). Każde przejście to operacje na małych macierzach $l \times l$. Złożoność $O(n)$.
+\end{itemize}
+Łączna złożoność wynosi $O(n)$.
+
+\section{Wyniki eksperymentów}
+Testy wydajnościowe i dokładnościowe przeprowadzono dla macierzy dobrze uwarunkowanych o rozmiarach $n \in \{10^3, 10^4 \dots, 10^6\}$ generowanych funkcją `blockmat`.
+
+\subsection{Analiza czasu wykonania}
+Poniższa tabela oraz wykres (Rysunek 1) prezentują czasy działania algorytmów.
+
+\begin{table}[H]
+\centering
+\caption{Czas wykonania algorytmów [s] w zależności od rozmiaru macierzy}
+\label{tab:czasy}
+\begin{tabular}{rcccc}
+\toprule
+$n$ & \textbf{GNP} & \textbf{GPP} & \textbf{LUNP} & \textbf{LUPP} \\
+\midrule
+16       & $1.0\cdot10^{-6}$ & $1.0\cdot10^{-6}$ & $1.0\cdot10^{-6}$ & $1.0\cdot10^{-6}$ \\
+1000     & $9.1\cdot10^{-5}$ & $1.03\cdot10^{-4}$ & $1.22\cdot10^{-4}$ & $1.39\cdot10^{-4}$ \\
+10000    & $9.04\cdot10^{-4}$ & $5.21\cdot10^{-4}$ & $5.76\cdot10^{-4}$ & $6.78\cdot10^{-4}$ \\
+50000    & $2.65\cdot10^{-3}$ & $3.05\cdot10^{-3}$ & $3.36\cdot10^{-3}$ & $3.90\cdot10^{-3}$ \\
+100000   & $5.48\cdot10^{-3}$ & $6.23\cdot10^{-3}$ & $6.88\cdot10^{-3}$ & $8.01\cdot10^{-3}$ \\
+500000   & $2.92\cdot10^{-2}$ & $3.34\cdot10^{-2}$ & $3.67\cdot10^{-2}$ & $4.17\cdot10^{-2}$ \\
+750000   & $4.35\cdot10^{-2}$ & $4.99\cdot10^{-2}$ & $5.40\cdot10^{-2}$ & $6.29\cdot10^{-2}$ \\
+1000000  & $5.64\cdot10^{-2}$ & $6.66\cdot10^{-2}$ & $7.18\cdot10^{-2}$ & $8.38\cdot10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{times.png}
+    \caption{Zależność czasu obliczeń od rozmiaru macierzy $n$.}
+    \label{fig:times}
+\end{figure}
+
+
+\textbf{Interpretacja:} Wyniki potwierdzają teoretyczną złożoność $O(n)$ – czas rośnie liniowo wraz z rozmiarem problemu. Dla $n=10^6$ czas wynosi około 0.15s. Algorytmy z pivotingiem (GPP, LUPP) są nieznacznie wolniejsze od ich odpowiedników bez pivotingu (narzut na wyszukiwanie maksimum i permutacje), a rozkład LU jest nieco wolniejszy od eliminacji Gaussa (narzut strukturalny i dwuetapowość), lecz różnice te są rzędu stałego czynnika.
+
+\subsection{Analiza błędu względnego}
+Tabela \ref{tab:bledy} i wykres (Rysunek 2) przedstawiają błąd względny rozwiązania $\frac{||x_{obl} - x_{dokl}||}{||x_{dokl}||}$.
+
+\begin{table}[H]
+\centering
+\caption{Błędy względne algorytmów w zależności od rozmiaru macierzy}
+\label{tab:bledy}
+\begin{tabular}{rcccc}
+\toprule
+$n$ & \textbf{GNP} & \textbf{GPP} & \textbf{LUNP} & \textbf{LUPP} \\
+\midrule
+16       & $6.64\cdot10^{-16}$ & $2.76\cdot10^{-16}$ & $5.12\cdot10^{-16}$ & $4.86\cdot10^{-16}$ \\
+1000     & $1.23\cdot10^{-14}$ & $2.40\cdot10^{-16}$ & $1.13\cdot10^{-14}$ & $2.31\cdot10^{-16}$ \\
+10000    & $1.67\cdot10^{-14}$ & $5.24\cdot10^{-16}$ & $2.32\cdot10^{-14}$ & $5.17\cdot10^{-16}$ \\
+50000    & $1.02\cdot10^{-13}$ & $5.00\cdot10^{-16}$ & $1.02\cdot10^{-13}$ & $4.92\cdot10^{-16}$ \\
+100000   & $2.54\cdot10^{-13}$ & $4.66\cdot10^{-16}$ & $1.70\cdot10^{-13}$ & $4.58\cdot10^{-16}$ \\
+500000   & $6.07\cdot10^{-13}$ & $4.32\cdot10^{-16}$ & $6.29\cdot10^{-13}$ & $4.25\cdot10^{-16}$ \\
+750000   & $5.30\cdot10^{-13}$ & $4.12\cdot10^{-16}$ & $3.78\cdot10^{-13}$ & $4.05\cdot10^{-16}$ \\
+1000000  & $7.06\cdot10^{-14}$ & $4.11\cdot10^{-16}$ & $8.64\cdot10^{-14}$ & $4.03\cdot10^{-16}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{rels_avg.png}
+    \caption{Zależność błędu względnego od rozmiaru macierzy $n$ (skala logarytmiczna).}
+    \label{fig:rels}
+\end{figure}
+
+\textbf{Interpretacja:} Metody bez pivotingu (GNP, LUNP) wykazują wyraźny wzrost błędu wraz ze wzrostem $n$, osiągając poziom $10^{-13}$, co świadczy o błędach zaokrągleń. Metody z częściowym wyborem elementu głównego (GPP, LUPP) utrzymują błąd na poziomie precyzji maszynowej ($10^{-16}$), co dowodzi ich wysokiej stabilności numerycznej.
+
+\subsection{Wpływ rozmiaru bloku $l$ na wyniki}
+W celu zbadania wpływu wielkości podmacierzy na działanie algorytmów, przeprowadzono dodatkowe testy dla rozmiarów bloku $l=2$ oraz $l=10$. Poniższe wykresy prezentują porównanie czasów wykonania oraz błędów względnych dla wszystkich badanych metod.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{times_l.png}
+        \caption{Porównanie czasów obliczeń dla $l=2$ i $l=10$.}
+        \label{fig:times_l}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rels_l.png}
+        \caption{Porównanie błędów względnych dla $l=2$ i $l=10$.}
+        \label{fig:rels_l}
+    \end{minipage}
+\end{figure}
+
+Na podstawie wykresu 4 można stwierdzić, że rozmiar bloku $l$ nie ma wpływu na błędy względne algorytmów. Błędy względne dla $l=10$ pozostają na tym samym poziomie rzędów wielkości, co dla $l=2$ (odpowiednio $\approx 10^{-16}$ dla metod z pivotingiem i wzrost dla metod bez pivotingu).
+
+Wykres 3 pokazuje natomiast wyraźną korelację między rozmiarem bloku a czasem wykonania. Wzrost parametru $l$ powoduje wydłużenie czasu obliczeń, co wynika ze zwiększonej liczby operacji wewnątrz bloków (złożoność operacji wewnątrzblokowych rośnie kwadratowo lub sześciennie względem $l$). Przykładowo dla największej badanej macierzy $n=10^6$:
+\begin{itemize}
+    \item dla $l=2$ czas wynosi około $0.05\,s$,
+    \item dla $l=10$ czas wzrasta do około $0.25\,s$.
+\end{itemize}
+Mimo wzrostu czasu, zależność od głównego rozmiaru macierzy $n$ pozostaje liniowa.
+
+\section{Wnioski}
+\begin{enumerate}
+    \item Zastosowanie struktury blokowej pozwoliło na zredukowanie złożoności czasowej i pamięciowej do $O(n)$, co umożliwia efektywne rozwiązywanie bardzo dużych układów równań.
+    \item Częściowy wybór elementu głównego jest niezbędny dla uniknięcia błędów wynikających z błędów zaokrągleń algorytmów, przy czym jego koszt obliczeniowy jest pomijalny.
+    \item Eliminacja Gaussa i rozkład LU dają bardzo zbliżone wyniki czasowe i jakościowe. Rozkład LU jest bardziej efektywny w przypadku konieczności wielokrotnego rozwiązywania układu z tą samą macierzą $A$ (dopiero przy rozwiązywaniu układu $LUx = b$ potrzebujemy wektora b).
+\end{enumerate}
+
+\end{document}

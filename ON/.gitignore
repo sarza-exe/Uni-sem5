@@ -1,7 +1,10 @@
 plots/
+Lab5/test.jl
 test.jl
 *.aux
 *.log
 *.out
 *.toc
 *.txt
+*.png
+*.zip

@@ -17,6 +17,42 @@ mutable struct BlockMatrix
 end
 
 """
+Zczytuje wektor b z pliku a jeśli inB == "none" to oblicza b na podstawie b=Ax gdzie x to wektor jedynek
+"""
+function get_b_vector(inB::String, A::BlockMatrix)
+    b = nothing
+    x_is_ones = false
+
+    # calculate b=Ax where x is a vector of ones
+    if inB == "none"
+        x_is_ones = true
+        n = A.n
+        l = A.l
+        b = zeros(Float64,n)
+        nb = div(n, l)
+
+        for k in 1:nb
+            range_k = ((k-1)*l + 1) : (k*l)
+            b[range_k] += sum(A.A_blocks[:, :, k], dims=2) # to every b[i] we're adding the correspongind sum of A row
+            if k > 1 # B_blocks start at index 2
+                b[range_k] += sum(A.B_blocks[:, :, k], dims=2)
+            end
+            if k < nb # C_blocks end at index nb-1
+                b[range_k] += sum(A.C_blocks[:, :, k], dims=2)
+            end
+        end
+        
+        # println("Obliczono wektor prawych stron b na podstawie macierzy A i wektora x=(1...1)")
+        # println(b)
+    else
+        b = read_B_Vector(A.n, inB)
+        # println("zczytano B")
+        # println(b)
+    end
+    return b, x_is_ones
+end
+
+"""
 Funkcja czyta plik z zawartości macierzy A i każdy element dopasowuje do odpowiedniego bloku A_k, B_k lub C_k
 Return BlockMatrix macierzy z pliku inA
 """
@@ -55,6 +91,11 @@ function read_A_Matrix(inA::String)
                 B_blocks[local_i, local_j, block_i] = val
             end
         end 
+        # println(n)
+        # println(l)
+        # println(A_blocks)
+        # println(B_blocks)
+        # println(C_blocks)
         return BlockMatrix(n, l, A_blocks, B_blocks, C_blocks)
     end
 end
@@ -132,11 +173,20 @@ function run_algorithms(A, b, algs, x_is_ones)
 
         # Benchmark
         if ok
-            println("Benchmark: $name...")
+            #println("Benchmark: $name...")
             
             # setup=(...) wykonuje się przed każdą próbką, ale nie wlicza się do czasu!
             # Używamy $ przy zmiennych lokalnych (A, b, func), żeby makro je widziało.
-            elapsed = @belapsed $func(A_c, b_c) setup=(A_c=deepcopy($A); b_c=copy($b))
+            elapsed = try
+                @belapsed begin
+                    A_c = deepcopy($A)
+                    b_c = copy($b)
+                    $func(A_c, b_c)
+                end
+            catch e
+                @printf("[%s] BENCH ERROR: %s\n", name, sprint(showerror, e))
+                0.0
+            end
         else
             elapsed = 0.0 
             @printf("[%s] ERROR: %s\n", name, err_msg)
