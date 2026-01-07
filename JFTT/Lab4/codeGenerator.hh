@@ -60,7 +60,7 @@ public:
         return v;
     }
 
-    // Emituj j_lable i dopisz do pending_fixups
+    // Emituj string j_lable i dopisz do pending_fixups. Jeśli poprzez defineLable lable ma już numer linii skoku to go dopisz.
     void emitLable(int lable, std::string j_lable) {
         auto it = lable_address.find(lable);
         if (it != lable_address.end()) { // lable already known -> emit direct
@@ -74,10 +74,9 @@ public:
 
     // Zdefiniuj etykietę (oznacz miejsce aktualnym indeksem kodu) i backpatchuj
     void defineLable(int lable) {
-        std::cout<<"Defining lable "<<lable<<"\n";
         int addr = (int)code->size();
         if (lable_address.find(lable) != lable_address.end()) {
-            std::cerr << "Label " << lable << " already defined\n";
+            std::cerr << "Lable " << lable << " already defined\n";
             return;
         }
         lable_address[lable] = addr;
@@ -128,6 +127,10 @@ public:
     long long getCurrentLine()
     {
         return (long long)code->size();
+    }
+
+    void generateDiv(){
+        return;
     }
 
     void generateMult(long long jump_lable ){

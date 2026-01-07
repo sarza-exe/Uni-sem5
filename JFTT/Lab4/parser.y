@@ -8,6 +8,8 @@ using namespace std;
 
 struct Symbol;
 
+struct ForLoopInfo;
+
 struct Identifier {
     char *pid;
     long long num;
@@ -96,7 +98,6 @@ void set_arguments(const std::string& name, std::vector<const char*> args, long 
         if (!param.is_T && argIsArrayType) yyerror("Expected scalar variable as argument but got array");
         if (arg->is_O && param.is_I) yyerror("Cannot pass O argument to I parameter");
         if (arg->is_I && !param.is_I) yyerror("Cannot pass I argument to not I parameter");
-        std::cout<<argName<<" "<<arg->is_I<<" "<<"\n";
 
         if (param.is_T) {
             if (arg->is_param && arg->is_T) {
@@ -271,6 +272,46 @@ void save_address_to_reg(VariableInfo *info, std::string reg){
     save_to_reg(info, reg, false);
 }
 
+ForLoopInfo* create_for_loop(char* pid, ValueInfo* fromVal, ValueInfo* toVal, bool is_downto) {
+    
+    ForLoopInfo *info = symbolTable.declareIterator(pid, is_downto); 
+    
+    // Zapisz wartość początkową (FROM) do iteratora
+    save_value_to_reg(fromVal, "a");
+    codeGen.emit("STORE", info->iteratorAddr);
+    
+    // Zapisz wartość końcową (TO/DOWNTO) do ukrytej zmiennej (limit)
+    save_value_to_reg(toVal, "a");
+    codeGen.emit("STORE", info->limitAddr);
+
+    int L_start = codeGen.newLable();
+    codeGen.defineLable(L_start); // miejsce początku pętli
+    codeGen.pushLable(L_start);
+    
+    if (!is_downto) { // from 2 to 5.
+        // Pętla TO (i++). Warunek stopu: Jeśli (iterator - limit) > 0 to KONIEC.
+        codeGen.emit("LOAD", info->limitAddr);
+        codeGen.emit("SWP b");
+        codeGen.emit("LOAD", info->iteratorAddr);
+        codeGen.emit("SUB b"); // acc = iterator - limit
+    } else { // from 5 down to 2
+        // Pętla DOWNTO (i--). Warunek stopu Jeśli (limit - iterator) > 0 to KONIEC.
+        codeGen.emit("LOAD", info->iteratorAddr);
+        codeGen.emit("SWP b");
+        codeGen.emit("LOAD", info->limitAddr);
+        codeGen.emit("SUB b");  // acc = limit - iterator
+    }
+
+    int L_end = codeGen.newLable();
+    codeGen.emitLable(L_end, "JPOS");
+    codeGen.pushLable(L_end);
+    
+    // info->startLabel = startLabel;
+    // info->endLabel = jumpInstrIndex;
+    
+    return info;
+}
+
 const std::string JPOS_lable = "JPOS";
 const std::string JZERO_lable = "JZERO";
 
@@ -289,6 +330,7 @@ const std::string JZERO_lable = "JZERO";
     Args *args;
     ProcCall *procCall;
     const std::string *lable;
+    ForLoopInfo* loop_info;
 }
 
 
@@ -301,6 +343,7 @@ const std::string JZERO_lable = "JZERO";
 %type <procCall> proc_call
 %type <type> type
 %type <args> args
+%type <loop_info> for_start
 
 %token ERROR
 
@@ -337,12 +380,12 @@ procedure_head: PROCEDURE PIDENTIFIER {
 procedures:
     procedures procedure_head proc_head IS declarations IN commands END {
         codeGen.emit("LOAD", symbolTable.getReturnAddress());
-        codeGen.emit("RTRN");
+        codeGen.emit("RTRN #" + symbolTable.currentProcedure());
         symbolTable.leaveScope();
         }
     | procedures procedure_head proc_head IS IN commands END {
         codeGen.emit("LOAD", symbolTable.getReturnAddress());
-        codeGen.emit("RTRN");
+        codeGen.emit("RTRN #" + symbolTable.currentProcedure());
         symbolTable.leaveScope();
         }
     | %empty
@@ -396,6 +439,15 @@ if_start: /* pomocniczy nieterminal, wstawia *$1 label i pushLable(label) */
 
 then_block: THEN commands;
 
+for_start:
+    FOR PIDENTIFIER FROM value TO value DO {
+        $$ = create_for_loop($2->pid, $4, $6, false);
+    }
+    | FOR PIDENTIFIER FROM value DOWNTO value DO {
+        $$ = create_for_loop($2->pid, $4, $6, true);
+    }
+    ;
+
 then_tail: /* to jest miejsce po wykonaniu then_block */ 
     { 
         int L_else = codeGen.popLable();
@@ -417,6 +469,7 @@ command:
         // v := expr, r_b zawiera adres v
         VariableInfo *info = $1;
         if(info->sym->is_I) yyerror("Cannot modify constant I variable");
+        if(info->sym->is_iterator) yyerror("Cannot modify FOR iterator");
 
         codeGen.emit("SWP f");
         save_address_to_reg(info, "b");
@@ -448,8 +501,24 @@ command:
             int L_start = codeGen.popLable();
             codeGen.emitLable(L_start, *$5 );
         }
-    | FOR PIDENTIFIER FROM value TO value DO commands ENDFOR
-    | FOR PIDENTIFIER FROM value DOWNTO value DO commands ENDFOR 
+    | for_start commands ENDFOR  {
+        ForLoopInfo* info = $1;
+        
+        codeGen.emit("LOAD", info->iteratorAddr);
+        
+        if (info->is_downto) codeGen.emit("DEC a"); 
+        else codeGen.emit("INC a");
+        
+        codeGen.emit("STORE", info->iteratorAddr);
+        
+        int L_end = codeGen.popLable();
+        int L_start = codeGen.popLable();
+        codeGen.emitLable(L_start, "JUMP"); // skocz z powrotem na początek
+        codeGen.defineLable(L_end);
+
+        symbolTable.removeIterator();
+        delete info;
+    }
     | proc_call SEMICOLON {
         if(!symbolTable.procedureExists($1->id->pid)) yyerror(("Calling undeclared procedure \"" + std::string($1->id->pid) + "\"").c_str());
         if(symbolTable.currentProcedure() == $1->id->pid) yyerror(("Recursive call for procedure \"" + std::string($1->id->pid) + "\"").c_str());
@@ -542,6 +611,7 @@ expression: // zapisuje wartość wyrażenia do r_a
             // generate_division_code w jednym rejestrze wynik w drugim reszta z dzielenia(modulo)
             save_value_to_reg($1, "b");
             save_value_to_reg($3, "c");
+            codeGen.generateDiv();
         }
     }
     | value MOD value {
@@ -551,6 +621,7 @@ expression: // zapisuje wartość wyrażenia do r_a
         else{
             save_value_to_reg($1, "b");
             save_value_to_reg($3, "c");
+            codeGen.generateDiv();
         }
     }
     | value { save_value_to_reg($1, "a");}

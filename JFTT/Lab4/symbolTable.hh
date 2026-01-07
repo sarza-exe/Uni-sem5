@@ -15,6 +15,16 @@ struct Symbol {
     bool is_O = false;
     bool is_T = false;
     bool is_initialized = false; // tylko dla zmiennych
+    bool is_iterator = false;
+};
+
+struct ForLoopInfo {
+    std::string iteratorName;
+    long long iteratorAddr;
+    long long limitAddr; // Adres ukrytej zmiennej z limitem
+    long long startLabel; // Etykieta początku pętli (skok powrotny)
+    long long endLabel;   // Etykieta końca pętli (skok wyjścia)
+    bool is_downto;       // true jeśli DOWNTO
 };
 
 struct Procedure {
@@ -28,6 +38,7 @@ struct Procedure {
 class SymbolTable {
     std::vector<std::map<std::string, Symbol>> scopes;
     std::map<std::string, Procedure> procedures;
+    std::vector<ForLoopInfo*> forStack;
     long long memory_offset = 0;
     const long long MEMORY_END = LLONG_MAX/2;
     std::string currProcedure = "";
@@ -53,7 +64,6 @@ public:
     }
 
     long long getProcedureLable(const std::string& procName){
-        std::cout << "trying to get label for proc "<<procedures[procName].name<<" label "<<procedures[procName].startLable<<"\n";
         if(!procedureExists(procName)) throw std::invalid_argument("Getting lable of unexisting procedure " + procName);
         return procedures[procName].startLable;
     }
@@ -73,7 +83,6 @@ public:
         proc.startLable = startLable;
         procedures.emplace(procName, std::move(proc)); // albo procedures[procName] = proc;
         currProcedure = procName;
-        std::cout << procName << " has start label: " << startLable << "\n";
         return proc.returnAddressVar;
     }
 
@@ -140,8 +149,6 @@ public:
             Symbol* arg = getSymbol(argName);
             if(arg == nullptr) throw std::invalid_argument("Trying to call procedure " + name + "with undeclared variable " + name);
             Symbol param = params.at(i);
-
-            std::cout<<"argument " << arg << " at " << param.memory_address<<"\n";
         }
     }
 
@@ -182,6 +189,39 @@ public:
         s.is_array = false;
         scopes.back().emplace(name, std::move(s));
         ++memory_offset;
+    }
+
+    // Rejestruje nową zmienną w scopie
+    ForLoopInfo* declareIterator(const std::string& name, bool is_downto)
+    {
+        if (exists(name)) throw std::invalid_argument("Double variable declaration: " + name);
+        if (memory_offset + 1 > MEMORY_END) throw std::overflow_error("Run out of memory for variable: " + name);
+
+        Symbol s;
+        s.memory_address = memory_offset;
+        s.is_array = false;
+        s.is_iterator = true;
+        s.is_initialized = true;
+        scopes.back().emplace(name, std::move(s));
+
+        ForLoopInfo *for_info = new ForLoopInfo();
+        for_info->iteratorName = name;
+        for_info->iteratorAddr = memory_offset;
+        ++memory_offset;
+        for_info->limitAddr = memory_offset;
+        ++memory_offset;
+        for_info->is_downto = is_downto;
+
+        forStack.push_back(for_info);
+        return for_info;
+    }
+
+    void removeIterator(){
+        std::string name = forStack.back()->iteratorName;
+        if (auto search = scopes.back().find(name); search != scopes.back().end()){
+            scopes.back().erase(search);
+        }
+        forStack.pop_back();
     }
 
     // Rejestruje tablicę w scopie
