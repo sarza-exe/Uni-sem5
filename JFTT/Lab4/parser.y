@@ -73,6 +73,7 @@ void semantic_error(long long lineno, char const *s) {
     exit(-1);
 }
 
+// name - procedure name, args - list of arguments to pass to procedure
 void set_arguments(const std::string& name, std::vector<const char*> args, long long line){
     std::vector<Symbol> params = symbolTable.getParameters(name);
     int argsSize = args.size();
@@ -120,6 +121,7 @@ void set_arguments(const std::string& name, std::vector<const char*> args, long 
             
         }
         else{
+            if(symbolTable.isParameterInitialized(name, param.name, arg)) arg->is_initialized = true;
             if (arg->is_param) {
             // Przekazujemy dalej parametr Zmienna 'arg' już trzyma ADRES właściwej zmiennej. 
             // Musimy ten adres przepisać do nowego parametru.
@@ -278,7 +280,7 @@ ForLoopInfo* create_for_loop(char* pid, ValueInfo* fromVal, ValueInfo* toVal, bo
     
     // Zapisz wartość początkową (FROM) do iteratora
     save_value_to_reg(fromVal, "a");
-    codeGen.emit("STORE", info->iteratorAddr);
+    codeGen.emit("STORE", info->iteratorAddr, "FOOOOOOOOOR LOOOOOOOOOP STAAAAAAAAART");
     
     // Zapisz wartość końcową (TO/DOWNTO) do ukrytej zmiennej (limit)
     save_value_to_reg(toVal, "a");
@@ -288,13 +290,14 @@ ForLoopInfo* create_for_loop(char* pid, ValueInfo* fromVal, ValueInfo* toVal, bo
     codeGen.defineLable(L_start); // miejsce początku pętli
     codeGen.pushLable(L_start);
     
-    if (!is_downto) { // from 2 to 5.
+    if (!is_downto) { // from 0 to 5.
         // Pętla TO (i++). Warunek stopu: Jeśli (iterator - limit) > 0 to KONIEC.
         codeGen.emit("LOAD", info->limitAddr);
         codeGen.emit("SWP b");
         codeGen.emit("LOAD", info->iteratorAddr);
         codeGen.emit("SUB b"); // acc = iterator - limit
     } else { // from 5 down to 2
+    // from 5 downto 0 
         // Pętla DOWNTO (i--). Warunek stopu Jeśli (limit - iterator) > 0 to KONIEC.
         codeGen.emit("LOAD", info->iteratorAddr);
         codeGen.emit("SWP b");
@@ -504,7 +507,7 @@ command:
     | for_start commands ENDFOR  {
         ForLoopInfo* info = $1;
         
-        codeGen.emit("LOAD", info->iteratorAddr);
+        codeGen.emit("LOAD", info->iteratorAddr, "FOOOOOOOOR LOOOOOOOP EEEEEEEEEEENDDDD AT NEXT JUMP");
         
         if (info->is_downto) codeGen.emit("DEC a"); 
         else codeGen.emit("INC a");
@@ -612,6 +615,7 @@ expression: // zapisuje wartość wyrażenia do r_a
             save_value_to_reg($1, "b");
             save_value_to_reg($3, "c");
             codeGen.generateDiv();
+            codeGen.emit("SWP h");
         }
     }
     | value MOD value {
@@ -622,6 +626,7 @@ expression: // zapisuje wartość wyrażenia do r_a
             save_value_to_reg($1, "b");
             save_value_to_reg($3, "c");
             codeGen.generateDiv();
+            codeGen.emit("SWP b");
         }
     }
     | value { save_value_to_reg($1, "a");}

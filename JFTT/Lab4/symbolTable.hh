@@ -6,6 +6,7 @@
 #include <climits>
 
 struct Symbol {
+    std::string name;
     long long memory_address; // Adres w pamięci maszyny wirtualnej
     bool is_array = false; 
     long long array_start; // Początek zakresu tablicy (np. -10)
@@ -33,6 +34,7 @@ struct Procedure {
     long long startLable; // Numer linii w VM, gdzie procedura się zaczyna
     // Lista parametrów w kolejności deklaracji - potrzebne do walidacji wywołania!
     std::vector<Symbol> parameters; //SKOPIOWAĆ BO PRZY LEAVE SCOPE USUNA SIE
+    std::map<std::string, bool> initialized;
 }; 
 
 class SymbolTable {
@@ -92,9 +94,19 @@ public:
         else return nullptr;
     }
 
+    // returns if parameter paramName from procedure procName is initialized. if it is and we're in some procedure we mark the arg to the procedure as initialized 
+    bool isParameterInitialized(std::string procName, std::string paramName, Symbol *arg){
+        bool isInit = procedures[procName].initialized[paramName];
+        if(isInit && currProcedure != "") procedures[currProcedure].initialized[arg->name] = true;
+        return isInit;
+    }
+
     void markInitialized(std::string name){
         Symbol* sym = getSymbol(name);
         if(sym->is_array) return;
+        if(sym->is_param){
+            procedures[currProcedure].initialized[name] = true;
+        }
         sym->is_initialized = true;
     }
 
@@ -158,6 +170,7 @@ public:
         if (memory_offset + 1 > MEMORY_END) throw std::overflow_error("Run out of memory for variable: " + name);
         
         Symbol s;
+        s.name = name;
         s.memory_address = memory_offset;
         s.is_param = true;
         s.is_array = (type == 'T');
@@ -171,6 +184,7 @@ public:
 
         if (procedures.find(currProcedure) != procedures.end()) {
             procedures[currProcedure].parameters.push_back(s);
+            procedures[currProcedure].initialized[name] = false;
         } else {
             throw std::runtime_error("Internal error: procedure not found");
         }
@@ -185,6 +199,7 @@ public:
         if (exists(name)) throw std::invalid_argument("Double variable declaration: " + name);
         if (memory_offset + 1 > MEMORY_END) throw std::overflow_error("Run out of memory for variable: " + name);
         Symbol s;
+        s.name = name;
         s.memory_address = memory_offset;
         s.is_array = false;
         scopes.back().emplace(name, std::move(s));
@@ -198,6 +213,7 @@ public:
         if (memory_offset + 1 > MEMORY_END) throw std::overflow_error("Run out of memory for variable: " + name);
 
         Symbol s;
+        s.name = name;
         s.memory_address = memory_offset;
         s.is_array = false;
         s.is_iterator = true;
@@ -231,6 +247,7 @@ public:
         long long tSize = end-start+1;
         if (memory_offset + tSize > MEMORY_END) throw std::overflow_error("Run out of memory for variable: " + name);
         Symbol sym;
+        sym.name = name;
         sym.memory_address = memory_offset;
         memory_offset = memory_offset + tSize;
         sym.is_array = true;

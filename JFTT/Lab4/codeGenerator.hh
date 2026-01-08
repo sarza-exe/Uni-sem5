@@ -41,6 +41,10 @@ public:
         code->push_back(instruction + " " + std::to_string(arg));
     }
 
+    void emit(std::string instruction, long long arg, std::string comment){
+        code->push_back(instruction + " " + std::to_string(arg) + " #" + comment);
+    }
+
     // Utwórz nową etykietę (zwraca jej id)
     int newLable() {
         return next_lable_id++;
@@ -130,7 +134,48 @@ public:
     }
 
     void generateDiv(){
-        return;
+        int L_zero_div = newLable();
+        emit("RST a");
+        emit("ADD c");
+        emitLable(L_zero_div, "JZERO");
+
+        emit("RST d"); emit("INC d"); // rd = 1
+        emit("RST h"); 
+
+        int L_start = newLable();
+        defineLable(L_start);
+        emit("RST a #Starting DIV"); //start
+        emit("ADD c"); emit("SHL a"); emit("SUB b"); //ra = 2*rc-rb
+        int L_loop_two = newLable();
+        emitLable(L_loop_two, "JPOS"); //if 2*rc-rb > 0 jump to loop_two
+
+        emit("SHL c"); //rc = 2*rc
+        emit("SHL d"); //rd = 2*rd
+        emitLable(L_start, "JUMP");
+
+        defineLable(L_loop_two);
+        emit("RST a"); //loop_two
+        emit("ADD d"); //ra = rd
+        int L_return = newLable();
+        emitLable(L_return, "JZERO"); //if(rd == 0) jump to the end
+
+        emit("RST a"); emit("ADD c"); emit("SUB b"); // ra = rc-rb
+        int L_VI = newLable();
+        emitLable(L_VI, "JPOS"); // if(rc-rb > 0) jump to VI
+
+        emit("SWP b"); emit("SUB c"); emit("SWP b"); //rb = rb-rc
+        emit("SWP h"); emit("ADD d"); emit("SWP h"); //rh = rh+rd
+ 
+        defineLable(L_VI);
+        emit("SHR c"); //VI
+        emit("SHR d");
+        emitLable(L_loop_two, "JUMP");
+        emitLable(L_return, "JUMP");
+        defineLable(L_zero_div);
+        emit("RST b");
+        emit("RST h");
+        defineLable(L_return);
+        //rh jako iloraz, a rb to reszta
     }
 
     void generateMult(long long jump_lable ){
