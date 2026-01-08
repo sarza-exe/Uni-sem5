@@ -506,6 +506,16 @@ command:
         }
     | for_start commands ENDFOR  {
         ForLoopInfo* info = $1;
+        int L_end = codeGen.popLable();
+
+        if (info->is_downto) { // from 5 to 0.
+            // Pętla TO (i++). Warunek stopu: Jeśli (iterator - limit) > 0 to KONIEC.
+            codeGen.emit("LOAD", info->limitAddr);
+            codeGen.emit("SWP b");
+            codeGen.emit("LOAD", info->iteratorAddr);
+            codeGen.emit("SUB b"); // acc = iterator - limit
+            codeGen.emitLable(L_end, "JZERO");
+        }
         
         codeGen.emit("LOAD", info->iteratorAddr, "FOOOOOOOOR LOOOOOOOP EEEEEEEEEEENDDDD AT NEXT JUMP");
         
@@ -514,7 +524,6 @@ command:
         
         codeGen.emit("STORE", info->iteratorAddr);
         
-        int L_end = codeGen.popLable();
         int L_start = codeGen.popLable();
         codeGen.emitLable(L_start, "JUMP"); // skocz z powrotem na początek
         codeGen.defineLable(L_end);
